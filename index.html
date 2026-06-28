@@ -1468,7 +1468,8 @@ Ejemplo NC: {"numero_folio":"45","fecha":"2026-03-10","rut_emisor":"76.962.937-8
     );
     if (dup) {
       dupWarn.style.display = 'flex';
-      dupWarn.innerHTML = '<i class="fa-solid fa-ban" style="color:var(--red)"></i> <strong style="color:var(--red)">Este documento ya está cargado</strong> — Folio ' + extracted.numero_folio + ' (' + tipoActual.toUpperCase() + ') ya existe en el sistema. Si lo borraste del sheet, actualizá los datos primero. <button onclick="refreshData().then(()=>{ document.getElementById(\'file-input\').dispatchEvent(new Event(\'change\')); })" style="margin-left:10px;background:var(--accent);color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px"><i class="fa-solid fa-rotate"></i> Actualizar y reintentar</button>';
+      const forceBtn = currentUser === 'admin' ? ` <button onclick="document.getElementById('dup-warning').style.display='none';document.getElementById('invoice-form').style.display='block';" style="margin-left:8px;background:var(--yellow);color:#000;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px"><i class="fa-solid fa-triangle-exclamation"></i> Guardar igual (admin)</button>` : '';
+      dupWarn.innerHTML = '<i class="fa-solid fa-ban" style="color:var(--red)"></i> <strong style="color:var(--red)">Este documento ya está cargado</strong> — Folio ' + extracted.numero_folio + ' (' + tipoActual.toUpperCase() + ') ya existe en el sistema. Si lo borraste del sheet, actualizá los datos primero. <button onclick="refreshData()" style="margin-left:8px;background:var(--accent);color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px"><i class="fa-solid fa-rotate"></i> Actualizar datos</button>' + forceBtn;
       document.getElementById('invoice-form').style.display = 'none';
       document.getElementById('ai-status').style.display = 'none';
       return;
