@@ -370,6 +370,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
           <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
             <div id="fact-totales-ventas"></div>
             <div id="fact-totales-compras"></div>
+            <div id="fact-totales-bh"></div>
             <div style="display:flex;gap:10px;">
               <button class="btn btn-secondary" onclick="exportarExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
               <button class="btn btn-secondary" onclick="exportarPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
@@ -620,6 +621,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
           <div class="form-group">
             <label>Monto transferido (CLP)</label>
             <input type="number" id="trf-monto" placeholder="0">
+            <div id="trf-saldo-info"></div>
           </div>
           <div class="form-group">
             <label>Comprobante (PDF o imagen)</label>
@@ -1181,12 +1183,14 @@ function renderFacturas() {
   const activas = filtered.filter(f => f.estado !== 'anulada');
   const ventas = activas.filter(f => f.tipo === 'venta');
   const compras = activas.filter(f => f.tipo === 'compra');
+  const bhs = activas.filter(f => f.tipo === 'bh');
   const tot = arr => ({ neto: arr.reduce((s,f)=>s+f.neto,0), iva: arr.reduce((s,f)=>s+f.iva,0), total: arr.reduce((s,f)=>s+f.total,0) });
-  const tv = tot(ventas), tc = tot(compras);
+  const tv = tot(ventas), tc = tot(compras), tb = tot(bhs);
   const totDiv = document.getElementById('fact-totales');
   const mostrarVentas = ventas.length > 0;
   const mostrarCompras = compras.length > 0;
-  totDiv.style.display = (mostrarVentas || mostrarCompras) ? 'block' : 'none';
+  const mostrarBH = bhs.length > 0;
+  totDiv.style.display = (mostrarVentas || mostrarCompras || mostrarBH) ? 'block' : 'none';
   const tcFact = parseFloat(document.getElementById('dash-tc')?.value) || 890;
   const fmtUSD = n => 'USD ' + Math.round(Math.abs(n)/tcFact).toLocaleString('es-CL');
   const bloque = (label, color, t) => `
@@ -1199,6 +1203,7 @@ function renderFacturas() {
     </div>`;
   document.getElementById('fact-totales-ventas').innerHTML = mostrarVentas ? bloque('Ventas', 'var(--green)', tv) : '';
   document.getElementById('fact-totales-compras').innerHTML = mostrarCompras ? bloque('Compras', 'var(--red)', tc) : '';
+  document.getElementById('fact-totales-bh').innerHTML = mostrarBH ? bloque('BH', '#fbbf24', tb) : '';
   // Guardar filtered para exportar
   window._filteredFacturas = filtered;
 }
@@ -1704,7 +1709,17 @@ function openTransferenciaModal() {
     pendientes.map(f => `<option value="${f.folio}" data-id="${f.id}" data-monto="${f.total}">${f.razon||'Sin nombre'} — Folio ${f.folio} — ${fmt(f.total)}</option>`).join('');
   sel.onchange = function() {
     const opt = this.options[this.selectedIndex];
-    if (opt.dataset.monto) document.getElementById('trf-monto').value = Math.abs(opt.dataset.monto);
+    if (!opt.dataset.monto) { document.getElementById('trf-saldo-info').innerHTML = ''; return; }
+    const totalFactura = Math.abs(parseFloat(opt.dataset.monto) || 0);
+    const facturaId = opt.dataset.id;
+    const folioVal = opt.value;
+    const yaPagado = transferencias.filter(x => x.folioFactura === folioVal).reduce((s,x) => s+x.monto, 0);
+    const saldoPendiente = totalFactura - yaPagado;
+    document.getElementById('trf-monto').value = saldoPendiente > 0 ? saldoPendiente : totalFactura;
+    const color = saldoPendiente <= 0 ? 'var(--green)' : 'var(--yellow)';
+    document.getElementById('trf-saldo-info').innerHTML = saldoPendiente > 0
+      ? `<div style="font-size:12px;color:${color};margin-top:6px"><i class="fa-solid fa-circle-info"></i> Total factura: <strong>${fmt(totalFactura)}</strong> · Ya pagado: <strong>${fmt(yaPagado)}</strong> · Saldo pendiente: <strong>${fmt(saldoPendiente)}</strong></div>`
+      : `<div style="font-size:12px;color:var(--green);margin-top:6px"><i class="fa-solid fa-check"></i> Factura totalmente pagada (${fmt(yaPagado)} de ${fmt(totalFactura)})</div>`;
   };
   document.getElementById('trf-fecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('trf-save-status').innerHTML = '';
@@ -2183,9 +2198,12 @@ function renderCuentaCorriente() {
       <div style="background:var(--surface2);border-radius:12px;padding:20px;margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <h3 style="margin:0;font-size:15px">${proveedor}</h3>
-          <div style="text-align:right">
-            <div style="font-size:12px;color:var(--text2)">Saldo pendiente</div>
-            <div style="font-size:20px;font-weight:800;color:${color}">${fmt(saldo)}</div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px" onclick="exportarCCPDF('${proveedor.replace(/'/g,"\\'")}')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+            <div style="text-align:right">
+              <div style="font-size:12px;color:var(--text2)">Saldo pendiente</div>
+              <div style="font-size:20px;font-weight:800;color:${color}">${fmt(saldo)}</div>
+            </div>
           </div>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -2213,6 +2231,56 @@ function renderCuentaCorriente() {
         </table>
       </div>`;
   }).join('');
+}
+
+function exportarCCPDF(proveedor) {
+  const comprasProv = facturas.filter(f =>
+    (f.tipo === 'compra' || f.tipo === 'bh') &&
+    f.estado !== 'anulada' &&
+    (f.razon || '') === proveedor
+  );
+  const pagosProv = transferencias.filter(t => t.proveedor === proveedor);
+  const totalFacturado = comprasProv.reduce((s, f) => s + f.total, 0);
+  const totalPagado = pagosProv.reduce((s, t) => s + t.monto, 0);
+  const saldo = totalFacturado - totalPagado;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const now = new Date().toLocaleDateString('es-CL');
+
+  doc.setFontSize(16); doc.setTextColor(91, 106, 240);
+  doc.text('CUENTA CORRIENTE PROVEEDOR', 14, 18);
+  doc.setDrawColor(91, 106, 240); doc.setLineWidth(0.5); doc.line(14, 21, 196, 21);
+  doc.setTextColor(0, 0, 0); doc.setFontSize(10);
+  doc.setFont(undefined, 'bold'); doc.text('Proveedor:', 14, 30); doc.setFont(undefined, 'normal'); doc.text(proveedor, 50, 30);
+  doc.setFont(undefined, 'bold'); doc.text('Fecha:', 14, 37); doc.setFont(undefined, 'normal'); doc.text(now, 50, 37);
+
+  const movimientos = [
+    ...comprasProv.map(f => [String(f.fecha).substring(0,10), 'Folio ' + f.folio, f.tipo.toUpperCase(), fmt(f.total), f.estado]),
+    ...pagosProv.map(t => [String(t.fecha).substring(0,10), 'Pago N° ' + (t.numero || '—'), 'PAGO', '-' + fmt(t.monto), '—'])
+  ].sort((a, b) => a[0].localeCompare(b[0]));
+
+  doc.autoTable({
+    startY: 44,
+    head: [['Fecha', 'Documento', 'Tipo', 'Monto', 'Estado']],
+    body: movimientos,
+    headStyles: { fillColor: [91, 106, 240] },
+    styles: { fontSize: 9 },
+    columnStyles: { 3: { halign: 'right' } }
+  });
+
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+  doc.text('Total facturado: ' + fmt(totalFacturado), 14, finalY);
+  doc.setTextColor(22, 163, 74);
+  doc.text('Total pagado: -' + fmt(totalPagado), 14, finalY + 7);
+  doc.setFontSize(13);
+  doc.setTextColor(saldo > 0 ? 239 : 22, saldo > 0 ? 68 : 163, saldo > 0 ? 68 : 74);
+  doc.text('SALDO PENDIENTE: ' + fmt(saldo), 14, finalY + 17);
+  doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(156, 163, 175);
+  doc.text('Generado por WTF Chile CC — ' + now, 14, 285);
+
+  doc.save('CuentaCorriente_' + proveedor.replace(/[^a-zA-Z0-9]/g, '_') + '_' + now.replace(/\//g, '-') + '.pdf');
 }
 
 function renderMaestro() {
