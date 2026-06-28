@@ -297,8 +297,12 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
         <input type="number" id="dash-tc" value="890" style="width:80px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:13px" onchange="renderDashboard()">
       </div>
       <div class="stats-row" id="dash-stats"></div>
+      <!-- Saldo Itaú -->
+      <div id="dash-saldo-itau" style="margin:16px 0"></div>
       <!-- IVA a pagar -->
       <div id="dash-iva" style="margin:16px 0;display:none"></div>
+      <!-- Retención BH -->
+      <div id="dash-retencion-bh" style="margin:16px 0;display:none"></div>
       <!-- Gráfico y pendientes -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
         <div>
@@ -310,6 +314,12 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
           <div class="table-wrap"><table><thead><tr><th>Folio</th><th>Cliente</th><th>Monto</th></tr></thead>
           <tbody id="dash-pending"></tbody></table></div>
         </div>
+      </div>
+      <!-- Pendientes de pago -->
+      <div style="margin-top:16px">
+        <h3 style="font-size:14px;color:var(--text2);margin-bottom:12px">Pendientes de pago (compras + BH)</h3>
+        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Folio</th><th>Tipo</th><th>Proveedor</th><th>Monto</th><th>Estado</th></tr></thead>
+        <tbody id="dash-pending-pago"></tbody></table></div>
       </div>
     </div>
 
@@ -1038,27 +1048,81 @@ function renderDashboard() {
   const tc = parseFloat(document.getElementById('dash-tc')?.value) || 890;
   const fmtUSD = n => 'USD ' + Math.round(Math.abs(n)/tc).toLocaleString('es-CL');
 
-  // IVA a pagar
+  // — Saldo Itaú —
+  const saldoData = JSON.parse(localStorage.getItem('wtf_saldo_itau') || '{"monto":null,"fecha":null}');
+  const saldoDiv = document.getElementById('dash-saldo-itau');
+  if (saldoDiv) {
+    const saldoMonto = saldoData.monto !== null ? saldoData.monto : null;
+    const saldoFecha = saldoData.fecha || '';
+    const diasDesde = saldoFecha ? Math.floor((Date.now() - new Date(saldoFecha)) / 86400000) : null;
+    const alertColor = diasDesde === null ? 'var(--border)' : diasDesde === 0 ? 'var(--green)' : diasDesde <= 2 ? 'var(--yellow)' : 'var(--red)';
+    saldoDiv.innerHTML = `
+      <div style="background:var(--surface);border:1px solid ${alertColor};border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px">
+          <i class="fa-solid fa-building-columns" style="color:${alertColor};font-size:20px"></i>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px">Saldo Banco Itaú</div>
+            <div style="font-size:22px;font-weight:800;color:${saldoMonto!==null?(saldoMonto>=0?'var(--green)':'var(--red)'):'var(--text2)'}">${saldoMonto !== null ? fmt(saldoMonto) : '— sin datos'}</div>
+            ${saldoFecha ? `<div style="font-size:11px;color:${alertColor}">Actualizado ${diasDesde===0?'hoy':diasDesde===1?'ayer':'hace '+diasDesde+' días'} — ${new Date(saldoFecha).toLocaleDateString('es-CL')}</div>` : '<div style="font-size:11px;color:var(--text2)">Nunca actualizado</div>'}
+          </div>
+        </div>
+        <button onclick="actualizarSaldoItau()" class="btn btn-ghost" style="font-size:12px"><i class="fa-solid fa-pen"></i> Actualizar saldo</button>
+        ${saldoMonto !== null ? `<div style="margin-left:auto;text-align:right"><div style="font-size:11px;color:var(--text2)">Por cobrar</div><div style="font-size:14px;font-weight:700;color:var(--accent2)">+${fmt(pendientesVenta)}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">Saldo proyectado</div><div style="font-size:16px;font-weight:800;color:var(--green)">${fmt(saldoMonto + pendientesVenta)}</div></div>` : ''}
+      </div>`;
+  }
+
+  // — IVA a pagar —
   const ivaDebito = ventas.reduce((a,f) => a+f.iva, 0);
-  const ivaCredito = compras.reduce((a,f) => a+f.iva, 0); // BH no tiene IVA
+  const ivaCredito = compras.filter(f=>f.tipo==='compra').reduce((a,f) => a+f.iva, 0);
   const ivaNeto = ivaDebito - ivaCredito;
   const mesActual = document.getElementById('dash-month')?.value;
-  const mesNombre = mesActual ? ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(mesActual)] : '';
+  const mesNombre = mesActual ? MESES[parseInt(mesActual)] : '';
   const ivaDiv = document.getElementById('dash-iva');
   if (ivaDiv && ivaDebito > 0) {
+    // Calcular días para vencimiento (día 20 del mes siguiente)
+    let diasVenc = null, urgente = false;
+    if (mesActual) {
+      const hoy = new Date();
+      const mesVenc = parseInt(mesActual) % 12 + 1;
+      const anioVenc = parseInt(mesActual) === 12 ? hoy.getFullYear() + 1 : hoy.getFullYear();
+      const fechaVenc = new Date(anioVenc, mesVenc - 1, 20);
+      diasVenc = Math.ceil((fechaVenc - hoy) / 86400000);
+      urgente = diasVenc <= 5 && diasVenc >= 0;
+    }
+    const ivaColor = urgente ? 'var(--red)' : 'rgba(245,158,11,0.3)';
+    const ivaBg = urgente ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)';
     ivaDiv.style.display = 'block';
     ivaDiv.innerHTML = `
-      <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:14px 20px;display:flex;gap:32px;align-items:center;flex-wrap:wrap">
+      <div style="background:${ivaBg};border:1px solid ${ivaColor};border-radius:10px;padding:14px 20px;display:flex;gap:32px;align-items:center;flex-wrap:wrap">
+        ${urgente ? `<div style="font-size:13px;font-weight:700;color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> VENCE EN ${diasVenc} DÍA${diasVenc!==1?'S':''}</div>` : ''}
         <div style="font-size:12px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:1px">IVA ${mesNombre||'período seleccionado'}</div>
         <div><div style="font-size:11px;color:var(--text2)">Débito fiscal (ventas)</div><div style="font-weight:700">${fmt(ivaDebito)}</div></div>
         <div><div style="font-size:11px;color:var(--text2)">Crédito fiscal (compras)</div><div style="font-weight:700;color:var(--green)">-${fmt(ivaCredito)}</div></div>
-        <div><div style="font-size:11px;color:var(--text2)">IVA a pagar</div><div style="font-size:18px;font-weight:800;color:${ivaNeto>0?'var(--red)':'var(--green)'}">      ${fmt(ivaNeto)}</div></div>
-        ${mesActual ? `<div style="font-size:11px;color:var(--text2)">Vence el <strong>20 de ${['','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre','Enero'][parseInt(mesActual)]}</strong></div>` : ''}
+        <div><div style="font-size:11px;color:var(--text2)">IVA a pagar</div><div style="font-size:18px;font-weight:800;color:${ivaNeto>0?'var(--red)':'var(--green)'}">${fmt(ivaNeto)}</div></div>
+        ${mesActual ? `<div style="font-size:11px;color:var(--text2)">Vence el <strong>20 de ${MESES[parseInt(mesActual)%12+1]||MESES[1]}</strong>${diasVenc!==null?' ('+diasVenc+' días)':''}</div>` : ''}
       </div>`;
-  } else if (ivaDiv) {
-    ivaDiv.style.display = 'none';
-  }
+  } else if (ivaDiv) { ivaDiv.style.display = 'none'; }
 
+  // — Retención BH —
+  const bhsAll = filtered.filter(f => f.tipo === 'bh' && f.estado !== 'anulada');
+  const bhsPendientes = bhsAll.filter(f => f.estado === 'pendiente' || f.estado === 'parcial');
+  const retencionTotal = Math.round(bhsAll.reduce((a,f) => a + f.neto, 0) * 0.13);
+  const retencionPendiente = Math.round(bhsPendientes.reduce((a,f) => a + f.neto, 0) * 0.13);
+  const retDiv = document.getElementById('dash-retencion-bh');
+  if (retDiv && bhsAll.length > 0) {
+    retDiv.style.display = 'block';
+    retDiv.innerHTML = `
+      <div style="background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:14px 20px;display:flex;gap:32px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:12px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:1px"><i class="fa-solid fa-file-invoice"></i> Boletas de honorarios</div>
+        <div><div style="font-size:11px;color:var(--text2)">BH emitidas (neto)</div><div style="font-weight:700">${fmt(bhsAll.reduce((a,f)=>a+f.neto,0))}</div><div style="font-size:11px;color:var(--text2)">${bhsAll.length} boleta${bhsAll.length!==1?'s':''}</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Retención 13% total</div><div style="font-weight:700;color:#fbbf24">${fmt(retencionTotal)}</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Retención sobre pendientes</div><div style="font-size:16px;font-weight:800;color:var(--red)">${fmt(retencionPendiente)}</div></div>
+      </div>`;
+  } else if (retDiv) { retDiv.style.display = 'none'; }
+
+  // — Tarjetas —
+  const netoComprasSolo = filtered.filter(f=>f.tipo==='compra'&&f.estado!=='anulada').reduce((a,f)=>a+f.neto,0);
+  const netoBH = filtered.filter(f=>f.tipo==='bh'&&f.estado!=='anulada').reduce((a,f)=>a+f.neto,0);
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat-card">
       <div class="label">Ventas netas</div>
@@ -1066,17 +1130,18 @@ function renderDashboard() {
       <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(netoVentas)}</div>
     </div>
     <div class="stat-card">
-      <div class="label">Compras netas</div>
+      <div class="label">Compras + BH netas</div>
       <div class="value red">${fmt(netoCompras)}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(netoCompras)}</div>
+      ${netoBH>0?`<div style="font-size:11px;color:#fbbf24;margin-top:4px">inc. ${fmt(netoBH)} en BH</div>`:''}
     </div>
     <div class="stat-card">
-      <div class="label">Por cobrar (neto)</div>
+      <div class="label">Por cobrar</div>
       <div class="value blue">${fmt(pendientesVenta)}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(pendientesVenta)}</div>
     </div>
     <div class="stat-card">
-      <div class="label">Por pagar (neto)</div>
+      <div class="label">Por pagar</div>
       <div class="value yellow">${fmt(pendientesCompra)}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(pendientesCompra)}</div>
     </div>
@@ -1087,12 +1152,9 @@ function renderDashboard() {
     </div>
   `;
 
-  // Gráfico por cliente
+  // — Gráfico por cliente —
   const porCliente = {};
-  ventas.forEach(f => {
-    const k = f.razon || 'Sin nombre';
-    porCliente[k] = (porCliente[k]||0) + f.neto;
-  });
+  ventas.forEach(f => { const k = f.razon || 'Sin nombre'; porCliente[k] = (porCliente[k]||0) + f.neto; });
   const clientesOrdenados = Object.entries(porCliente).sort((a,b) => b[1]-a[1]).slice(0,8);
   const canvas = document.getElementById('dash-chart-clientes');
   if (canvas && clientesOrdenados.length) {
@@ -1114,11 +1176,34 @@ function renderDashboard() {
     });
   }
 
-  // Pendientes de cobro
-  const pending = ventas.filter(f => f.estado === 'pendiente').slice(0,6);
+  // — Pendientes de cobro —
+  const pending = ventas.filter(f => f.estado === 'pendiente' || f.estado === 'parcial').sort((a,b) => a.fecha.localeCompare(b.fecha)).slice(0,6);
   document.getElementById('dash-pending').innerHTML = pending.length ? pending.map(f => `
     <tr><td>${f.folio}</td><td>${(f.razon||'—').substring(0,22)}</td><td><strong>${fmt(f.neto)}</strong></td></tr>
-  `).join('') : '<tr><td colspan="3" class="empty-state">Sin pendientes</td></tr>';
+  `).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text2);padding:16px">Sin pendientes</td></tr>';
+
+  // — Pendientes de pago —
+  const pendingPago = compras.filter(f => f.estado === 'pendiente' || f.estado === 'parcial').sort((a,b) => a.fecha.localeCompare(b.fecha));
+  document.getElementById('dash-pending-pago').innerHTML = pendingPago.length ? pendingPago.map(f => `
+    <tr>
+      <td>${String(f.fecha).substring(0,10)}</td>
+      <td><strong>${f.folio}</strong></td>
+      <td><span class="badge badge-${f.tipo}">${f.tipo.toUpperCase()}</span></td>
+      <td>${(f.razon||'—').substring(0,24)}</td>
+      <td><strong style="color:var(--red)">${fmt(f.neto)}</strong></td>
+      <td><span class="badge badge-${f.estado}">${f.estado}</span></td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:16px">Sin pagos pendientes</td></tr>';
+}
+
+function actualizarSaldoItau() {
+  const actual = JSON.parse(localStorage.getItem('wtf_saldo_itau') || '{"monto":null}');
+  const input = prompt('Ingresá el saldo actual del Banco Itaú (en CLP):', actual.monto !== null ? actual.monto : '');
+  if (input === null) return;
+  const monto = parseFloat(String(input).replace(/\./g,'').replace(',','.'));
+  if (isNaN(monto)) { alert('Monto inválido'); return; }
+  localStorage.setItem('wtf_saldo_itau', JSON.stringify({ monto, fecha: new Date().toISOString() }));
+  renderDashboard();
 }
 
 // ==================== FACTURAS ====================
