@@ -2194,7 +2194,7 @@ function renderFactoring() {
   tbody.innerHTML = filtered.map(o => `
     <tr data-id="${o.id}" class="${o._selected?'selected':''}">
       <td class="checkbox-cell"><input type="checkbox" onchange="toggleSelect('factoring','${o.id}',this)" ${o._selected?'checked':''}></td>
-      <td>${o.fecha}</td>
+      <td>${String(o.fecha).substring(0,10)}</td>
       <td><strong>${o.nOrden}</strong></td>
       <td style="font-size:12px">${o.folios}</td>
       <td>${fmt(o.montoBruto)}</td>
