@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WTF Chile — Cuentas Corrientes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -25,7 +28,7 @@
   --radius: 10px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
 
 /* LOGIN */
 #login-screen {
@@ -625,7 +628,18 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
       <!-- Modal transferencia -->
       <div id="trf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
         <div style="background:var(--surface1);border-radius:16px;padding:32px;width:500px;max-width:95vw">
-          <h2 style="margin-bottom:20px">Registrar pago</h2>
+          <h2 style="margin-bottom:16px">Registrar pago</h2>
+          <!-- Upload comprobante para extracción automática -->
+          <div style="border:1.5px dashed var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;background:var(--surface2)">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <label for="trf-comprobante-file" style="cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500">
+                <i class="fa-solid fa-file-arrow-up"></i> Subir comprobante
+              </label>
+              <input type="file" id="trf-comprobante-file" accept=".pdf,image/*" style="display:none" onchange="extraerComprobante(this)">
+              <span id="trf-comp-filename" style="font-size:12px;color:var(--text2)">PDF o imagen — se extraen los datos automáticamente</span>
+            </div>
+            <div id="trf-comp-status" style="margin-top:8px;font-size:12px"></div>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Fecha</label>
@@ -1804,6 +1818,74 @@ function renderTransferencias() {
         <button class="icon-btn del" onclick="deleteTransferencia('${t.id}')"><i class="fa-solid fa-trash"></i></button>
       </td>
     </tr>`).join('');
+}
+
+async function extraerComprobante(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('trf-comp-status');
+  const filename = document.getElementById('trf-comp-filename');
+  filename.textContent = file.name;
+  status.innerHTML = '<span style="color:var(--accent)"><span class="spinner"></span> Leyendo comprobante...</span>';
+
+  try {
+    const toBase64 = f => new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+    const b64 = await toBase64(file);
+    const isPdf = file.type === 'application/pdf';
+    const mediaType = isPdf ? 'application/pdf' : file.type;
+
+    const prompt = `Sos un asistente que extrae datos de comprobantes de transferencia bancaria chilenos.
+Analizá el comprobante y devolvé SOLO un JSON con estos campos:
+{
+  "fecha": "YYYY-MM-DD",
+  "monto": 123456,
+  "numero_operacion": "12345678",
+  "medio": "transferencia"
+}
+- fecha: fecha de la transferencia en formato YYYY-MM-DD
+- monto: monto en pesos chilenos, solo número entero sin puntos ni símbolos
+- numero_operacion: número de operación, transacción o referencia (string)
+- medio: siempre "transferencia" para comprobantes bancarios
+Si no encontrás algún campo, dejalo en null. Solo devolvé el JSON, sin explicaciones.`;
+
+    const body = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: [{
+          type: isPdf ? 'document' : 'image',
+          source: { type: 'base64', media_type: mediaType, data: b64 }
+        }, { type: 'text', text: prompt }]
+      }]
+    };
+
+    const res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No se pudo parsear la respuesta');
+    const extracted = JSON.parse(match[0]);
+
+    if (extracted.fecha) document.getElementById('trf-fecha').value = extracted.fecha;
+    if (extracted.monto) document.getElementById('trf-monto').value = extracted.monto;
+    if (extracted.numero_operacion) document.getElementById('trf-numero').value = extracted.numero_operacion;
+    if (extracted.medio) { document.getElementById('trf-medio').value = extracted.medio; updateTrfPlaceholders(); }
+
+    status.innerHTML = `<span style="color:var(--green)"><i class="fa-solid fa-check"></i> Datos extraídos — revisá y confirmá antes de guardar</span>`;
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> No se pudo leer el comprobante. Completá los campos manualmente.</span>`;
+    console.error(e);
+  }
 }
 
 function updateTrfPlaceholders() {
