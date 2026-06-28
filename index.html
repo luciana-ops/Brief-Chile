@@ -614,18 +614,18 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
         <button class="btn-clear-filter" onclick="clearFilter('trf')">Limpiar</button>
       </div>
       <div class="table-toolbar">
-        <button class="btn btn-primary" onclick="openTransferenciaModal()"><i class="fa-solid fa-plus"></i> Nueva transferencia</button>
+        <button class="btn btn-primary" onclick="openTransferenciaModal()"><i class="fa-solid fa-plus"></i> Registrar pago</button>
       </div>
       <div class="table-wrap">
         <table><thead><tr>
-          <th>Fecha</th><th>Proveedor</th><th>Folio factura</th><th>Monto</th><th>N° Transferencia</th><th>Comprobante</th><th>Estado</th><th>Acciones</th>
+          <th>Fecha</th><th>Proveedor</th><th>Folio factura</th><th>Monto</th><th>N° Referencia</th><th>Medio de pago</th><th>Estado</th><th>Acciones</th>
         </tr></thead>
         <tbody id="trf-tbody"></tbody></table>
       </div>
       <!-- Modal transferencia -->
       <div id="trf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
         <div style="background:var(--surface1);border-radius:16px;padding:32px;width:500px;max-width:95vw">
-          <h2 style="margin-bottom:20px">Nueva transferencia</h2>
+          <h2 style="margin-bottom:20px">Registrar pago</h2>
           <div class="form-row">
             <div class="form-group">
               <label>Fecha</label>
@@ -633,7 +633,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
             </div>
             <div class="form-group">
               <label>Medio de pago</label>
-              <select id="trf-medio">
+              <select id="trf-medio" onchange="updateTrfPlaceholders()">
                 <option value="transferencia">Transferencia bancaria</option>
                 <option value="debito">Tarjeta débito</option>
                 <option value="efectivo">Efectivo</option>
@@ -642,25 +642,21 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
             </div>
           </div>
           <div class="form-group">
-            <label>N° Operación / Referencia (opcional)</label>
+            <label id="trf-numero-label">N° Operación / Referencia <span style="color:var(--text2)">(opcional)</span></label>
             <input type="text" id="trf-numero" placeholder="Ej: 12345678">
           </div>
           <div class="form-group">
-            <label>Factura de compra</label>
+            <label>Factura / BH a pagar</label>
             <select id="trf-folio-select"></select>
           </div>
           <div class="form-group">
-            <label>Monto transferido (CLP)</label>
+            <label id="trf-monto-label">Monto (CLP)</label>
             <input type="number" id="trf-monto" placeholder="0">
             <div id="trf-saldo-info"></div>
           </div>
           <div class="form-group">
-            <label>Comprobante (PDF o imagen)</label>
-            <input type="file" id="trf-archivo" accept=".pdf,image/*" style="padding:8px">
-          </div>
-          <div class="form-group">
-            <label>Notas</label>
-            <input type="text" id="trf-notas" placeholder="Opcional">
+            <label>Notas <span style="color:var(--text2)">(opcional)</span></label>
+            <input type="text" id="trf-notas" placeholder="Ej: Entradas cine cliente X, Uber aeropuerto...">
           </div>
           <div id="trf-save-status"></div>
           <div style="display:flex;gap:12px;margin-top:16px">
@@ -1802,12 +1798,29 @@ function renderTransferencias() {
       <td><strong>${t.folioFactura||'—'}</strong></td>
       <td><strong>${fmt(t.monto)}</strong></td>
       <td style="color:var(--text2);font-size:12px">${t.numero||'—'}</td>
-      <td>${t.comprobante ? '<span style="color:var(--green)"><i class="fa-solid fa-paperclip"></i> Adjunto</span>' : '<span style="color:var(--text2)">Sin archivo</span>'}</td>
+      <td>${(()=>{ const raw=t.notas||''; const parte=raw.split(' - ')[0].toLowerCase().trim(); const labels={transferencia:'<i class="fa-solid fa-building-columns"></i> Transferencia',debito:'<i class="fa-solid fa-credit-card"></i> Débito',efectivo:'<i class="fa-solid fa-money-bill"></i> Efectivo',otro:'<i class="fa-solid fa-circle-question"></i> Otro'}; const extra=raw.includes(' - ')?`<div style="font-size:11px;color:var(--text2);margin-top:2px">${raw.split(' - ').slice(1).join(' - ')}</div>`:''; return `<span style="font-size:12px;color:var(--text2)">${labels[parte]||raw||'—'}</span>${extra}`; })()}</td>
       <td><span class="badge badge-pagada">pagada</span></td>
       <td class="actions-cell">
         <button class="icon-btn del" onclick="deleteTransferencia('${t.id}')"><i class="fa-solid fa-trash"></i></button>
       </td>
     </tr>`).join('');
+}
+
+function updateTrfPlaceholders() {
+  const medio = document.getElementById('trf-medio').value;
+  const numInput = document.getElementById('trf-numero');
+  const numLabel = document.getElementById('trf-numero-label');
+  const montoLabel = document.getElementById('trf-monto-label');
+  const placeholders = {
+    transferencia: { ref: 'N° Operación / Referencia', placeholder: 'Ej: 12345678', monto: 'Monto transferido (CLP)' },
+    debito:        { ref: 'Últimos 4 dígitos tarjeta', placeholder: 'Ej: 4521', monto: 'Monto pagado (CLP)' },
+    efectivo:      { ref: 'Referencia', placeholder: 'Opcional', monto: 'Monto en efectivo (CLP)' },
+    otro:          { ref: 'Referencia', placeholder: 'Opcional', monto: 'Monto (CLP)' },
+  };
+  const p = placeholders[medio] || placeholders.transferencia;
+  numLabel.innerHTML = `${p.ref} <span style="color:var(--text2)">(opcional)</span>`;
+  numInput.placeholder = p.placeholder;
+  montoLabel.textContent = p.monto;
 }
 
 function openTransferenciaModal() {
@@ -1831,6 +1844,11 @@ function openTransferenciaModal() {
       : `<div style="font-size:12px;color:var(--green);margin-top:6px"><i class="fa-solid fa-check"></i> Factura totalmente pagada (${fmt(yaPagado)} de ${fmt(totalFactura)})</div>`;
   };
   document.getElementById('trf-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('trf-numero').value = '';
+  document.getElementById('trf-notas').value = '';
+  document.getElementById('trf-monto').value = '';
+  document.getElementById('trf-medio').value = 'transferencia';
+  updateTrfPlaceholders();
   document.getElementById('trf-save-status').innerHTML = '';
   document.getElementById('trf-modal').style.display = 'flex';
 }
@@ -1858,7 +1876,8 @@ async function guardarTransferencia() {
   const facturaTotal = parseFloat(opt.dataset.monto) || 0;
   const proveedor = opt.text.split(' — ')[0];
 
-  const t = { id: 'T' + Date.now(), fecha, folioFactura: folio, proveedor, monto, numero, notas: notas || medio, comprobante: '' };
+  const notasGuardadas = notas ? `${medio} - ${notas}` : medio;
+  const t = { id: 'T' + Date.now(), fecha, folioFactura: folio, proveedor, monto, numero, notas: notasGuardadas, comprobante: '' };
 
   document.getElementById('trf-save-status').innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Guardando...</div>';
   try {
