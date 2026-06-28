@@ -1,0 +1,2290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WTF Chile — Cuentas Corrientes</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #222638;
+  --border: #2e3250;
+  --accent: #5b6af0;
+  --accent2: #7c8cf8;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --text: #e8eaf6;
+  --text2: #9095b8;
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+/* LOGIN */
+#login-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; background: var(--bg);
+}
+.login-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 40px; width: 340px; text-align: center;
+}
+.login-box h1 { font-size: 22px; margin-bottom: 4px; color: var(--accent2); }
+.login-box p { color: var(--text2); margin-bottom: 28px; font-size: 13px; }
+.pin-display {
+  font-size: 32px; letter-spacing: 12px; margin: 20px 0;
+  height: 48px; color: var(--accent2);
+}
+.pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.pin-btn {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius); padding: 16px; font-size: 18px; cursor: pointer;
+  transition: background 0.15s;
+}
+.pin-btn:hover { background: var(--accent); }
+.pin-error { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 20px; }
+
+/* LAYOUT */
+#app { display: none; height: 100vh; flex-direction: row; }
+#sidebar {
+  width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0;
+}
+.sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.sidebar-logo h2 { color: var(--accent2); font-size: 16px; }
+.sidebar-logo p { color: var(--text2); font-size: 11px; margin-top: 2px; }
+.nav-item {
+  padding: 10px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  color: var(--text2); border-radius: 0; transition: all 0.15s; font-size: 13px;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--surface2); color: var(--accent2); border-left-color: var(--accent); }
+.nav-item i { width: 16px; text-align: center; }
+.nav-section { padding: 8px 20px 4px; font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+.sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+.user-pill { display: flex; align-items: center; gap: 8px; color: var(--text2); font-size: 12px; cursor: pointer; }
+.user-pill:hover { color: var(--red); }
+
+#main { flex: 1; overflow-y: auto; background: var(--bg); }
+.page { display: none; padding: 28px; }
+.page.active { display: block; }
+
+/* HEADER */
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 20px; font-weight: 600; }
+.page-header p { color: var(--text2); font-size: 13px; margin-top: 4px; }
+
+/* MONTH FILTER */
+.month-filter-bar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px; flex-wrap: wrap;
+}
+.month-filter-bar label { color: var(--text2); font-size: 12px; }
+.month-filter-bar select {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+}
+.btn-clear-filter {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+}
+.btn-clear-filter:hover { border-color: var(--accent); color: var(--accent2); }
+
+/* STATS */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.stat-card .label { color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-size: 20px; font-weight: 700; margin-top: 6px; }
+.stat-card .value.green { color: var(--green); }
+.stat-card .value.red { color: var(--red); }
+.stat-card .value.blue { color: var(--accent2); }
+.stat-card .value.yellow { color: var(--yellow); }
+
+/* BUTTONS */
+.btn { padding: 8px 16px; border-radius: 7px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-danger { background: var(--red); color: white; }
+.btn-danger:hover { background: #dc2626; }
+.btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent2); }
+.btn-success { background: var(--green); color: white; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* TABLE */
+.table-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.bulk-actions { display: none; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 12px; }
+.bulk-actions.visible { display: flex; }
+.selected-count { font-size: 12px; color: var(--accent2); font-weight: 600; }
+.table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  background: var(--surface); padding: 10px 12px; text-align: left;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+thead th:first-child { width: 40px; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface); }
+tbody tr.selected { background: rgba(91,106,240,0.1); }
+tbody td { padding: 10px 12px; font-size: 13px; }
+.checkbox-cell { text-align: center; }
+input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.badge-venta { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge-compra { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge-bh { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.badge-pendiente { background: rgba(245,158,11,0.15); color: var(--yellow); }
+.badge-pagada { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge-parcial { background: rgba(99,102,241,0.15); color: #818cf8; }
+.badge-anulada { background: rgba(156,163,175,0.15); color: #9ca3af; text-decoration: line-through; }
+.badge-factoring { background: rgba(91,106,240,0.15); color: var(--accent2); }
+.badge-conciliada { background: rgba(34,197,94,0.2); color: var(--green); }
+.actions-cell { display: flex; gap: 6px; }
+.icon-btn { background: none; border: none; cursor: pointer; padding: 4px 6px; border-radius: 5px; font-size: 13px; transition: all 0.15s; }
+.icon-btn.edit { color: var(--text2); }
+.icon-btn.edit:hover { background: var(--surface2); color: var(--accent2); }
+.icon-btn.del { color: var(--text2); }
+.icon-btn.del:hover { background: rgba(239,68,68,0.15); color: var(--red); }
+.empty-state { text-align: center; padding: 40px; color: var(--text2); }
+.empty-state i { font-size: 32px; margin-bottom: 12px; opacity: 0.4; }
+
+/* MODAL */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  z-index: 1000; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 28px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+}
+.modal h2 { font-size: 17px; margin-bottom: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 7px; padding: 9px 12px; font-size: 14px;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none; border-color: var(--accent);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.upload-area {
+  border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px;
+  text-align: center; cursor: pointer; transition: all 0.2s; color: var(--text2);
+}
+.upload-area:hover, .upload-area.dragover { border-color: var(--accent); color: var(--accent2); }
+.upload-area i { font-size: 28px; margin-bottom: 8px; display: block; }
+.ai-result { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 14px; }
+.ai-result p { color: var(--text2); font-size: 12px; margin-bottom: 8px; }
+.ai-chip { display: inline-block; background: rgba(91,106,240,0.15); color: var(--accent2); border-radius: 4px; padding: 2px 8px; font-size: 12px; margin: 2px; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent2); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* FACTORING */
+.factoring-match { background: var(--surface2); border: 1px solid var(--green); border-radius: var(--radius); padding: 14px; margin-top: 14px; }
+.factoring-match h4 { color: var(--green); font-size: 13px; margin-bottom: 8px; }
+.match-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.match-row:last-child { border-bottom: none; }
+
+/* ALERT */
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.alert-warning { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow); }
+.alert-danger { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); }
+.alert-success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: var(--green); }
+.alert-info { background: rgba(91,106,240,0.1); border: 1px solid rgba(91,106,240,0.3); color: var(--accent2); }
+
+/* PDF PREVIEW */
+.orden-pago-preview {
+  background: white; color: #1a1a2e; border-radius: 8px; padding: 24px;
+  font-family: 'Segoe UI', sans-serif; margin-top: 16px; font-size: 13px;
+}
+.orden-pago-preview h3 { font-size: 16px; border-bottom: 2px solid #5b6af0; padding-bottom: 8px; margin-bottom: 16px; color: #5b6af0; }
+.op-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #e5e7eb; }
+.op-row:last-child { border-bottom: none; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>WTF Chile</h1>
+    <p>Cuentas Corrientes & Factoring</p>
+    <div class="pin-display" id="pin-display">_ _ _ _</div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinPress(1)">1</button>
+      <button class="pin-btn" onclick="pinPress(2)">2</button>
+      <button class="pin-btn" onclick="pinPress(3)">3</button>
+      <button class="pin-btn" onclick="pinPress(4)">4</button>
+      <button class="pin-btn" onclick="pinPress(5)">5</button>
+      <button class="pin-btn" onclick="pinPress(6)">6</button>
+      <button class="pin-btn" onclick="pinPress(7)">7</button>
+      <button class="pin-btn" onclick="pinPress(8)">8</button>
+      <button class="pin-btn" onclick="pinPress(9)">9</button>
+      <button class="pin-btn" onclick="pinClear()" style="color:var(--text2)"><i class="fa-solid fa-delete-left"></i></button>
+      <button class="pin-btn" onclick="pinPress(0)">0</button>
+      <button class="pin-btn" onclick="pinEnter()" style="background:var(--accent);color:white"><i class="fa-solid fa-check"></i></button>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="sidebar">
+    <div class="sidebar-logo">
+      <h2>WTF Chile</h2>
+      <p>Cuentas Corrientes</p>
+    </div>
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" onclick="showPage('dashboard')"><i class="fa-solid fa-gauge"></i> Dashboard</div>
+    <div class="nav-section">Facturas</div>
+    <div class="nav-item" onclick="showPage('facturas')"><i class="fa-solid fa-file-invoice"></i> Ver facturas</div>
+    <div class="nav-item" onclick="showPage('subir')"><i class="fa-solid fa-cloud-arrow-up"></i> Subir factura</div>
+    <div class="nav-section">Operaciones</div>
+    <div class="nav-item" onclick="showPage('extracto')"><i class="fa-solid fa-building-columns"></i> Extracto bancario</div>
+    <div class="nav-item" onclick="showPage('factoring')"><i class="fa-solid fa-hand-holding-dollar"></i> Factoring</div>
+    <div class="nav-item" onclick="showPage('transferencias')"><i class="fa-solid fa-money-bill-transfer"></i> Transferencias</div>
+    <div class="nav-item" onclick="showPage('cuentacorriente')"><i class="fa-solid fa-scale-balanced"></i> Cta. cte. proveedores</div>
+    <div class="nav-item" onclick="showPage('gastos')"><i class="fa-solid fa-receipt"></i> Gastos operativos</div>
+    <div class="nav-section admin-only">Admin</div>
+    <div class="nav-item admin-only" onclick="showPage('maestro')"><i class="fa-solid fa-users"></i> Maestro</div>
+    <div class="sidebar-bottom">
+      <div class="user-pill" onclick="logout()">
+        <i class="fa-solid fa-circle-user"></i>
+        <span id="user-label">—</span>
+        <i class="fa-solid fa-arrow-right-from-bracket" style="margin-left:auto"></i>
+      </div>
+      <div class="user-pill" onclick="refreshData()" style="margin-top:8px;cursor:pointer;background:rgba(99,102,241,0.1)">
+        <i class="fa-solid fa-rotate" id="refresh-icon"></i>
+        <span>Actualizar datos</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header"><h1>Dashboard</h1><p>Resumen general de cuentas corrientes</p></div>
+      <div class="month-filter-bar">
+        <label><i class="fa-solid fa-calendar"></i> Filtrar por período:</label>
+        <select id="dash-year" onchange="renderDashboard()"></select>
+        <select id="dash-month" onchange="renderDashboard()">
+          <option value="">Todos los meses</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <button class="btn-clear-filter" onclick="clearFilter('dash')">Ver todo</button>
+        <span style="margin-left:16px;color:var(--text2);font-size:13px">TC USD:</span>
+        <input type="number" id="dash-tc" value="890" style="width:80px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:13px" onchange="renderDashboard()">
+      </div>
+      <div class="stats-row" id="dash-stats"></div>
+      <!-- IVA a pagar -->
+      <div id="dash-iva" style="margin:16px 0;display:none"></div>
+      <!-- Gráfico y pendientes -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+        <div>
+          <h3 style="font-size:14px;color:var(--text2);margin-bottom:12px">Facturación por cliente (ventas)</h3>
+          <canvas id="dash-chart-clientes" height="220"></canvas>
+        </div>
+        <div>
+          <h3 style="font-size:14px;color:var(--text2);margin-bottom:12px">Pendientes de cobro</h3>
+          <div class="table-wrap"><table><thead><tr><th>Folio</th><th>Cliente</th><th>Monto</th></tr></thead>
+          <tbody id="dash-pending"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FACTURAS -->
+    <div class="page" id="page-facturas">
+      <div class="page-header"><h1>Facturas</h1><p>Compras y ventas registradas</p></div>
+      <div class="month-filter-bar">
+        <label><i class="fa-solid fa-calendar"></i> Período:</label>
+        <select id="fact-year" onchange="renderFacturas()"></select>
+        <select id="fact-month" onchange="renderFacturas()">
+          <option value="">Todos</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="fact-tipo" onchange="renderFacturas()">
+          <option value="">Compras y ventas</option>
+          <option value="venta">Solo ventas</option>
+          <option value="compra">Solo compras</option>
+          <option value="bh">Solo BH</option>
+        </select>
+        <select id="fact-doc" onchange="renderFacturas()">
+          <option value="">Todos los docs</option>
+          <option value="FA">Solo FA</option>
+          <option value="NC">Solo NC</option>
+          <option value="BH">Solo BH</option>
+        </select>
+        <select id="fact-estado" onchange="renderFacturas()">
+          <option value="">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="pagada">Pagada</option>
+          <option value="parcial">Parcial</option>
+          <option value="anulada">Anulada</option>
+        </select>
+        <button class="btn-clear-filter" onclick="clearFilter('fact')">Limpiar</button>
+      </div>
+      <div class="table-toolbar">
+        <button class="btn btn-primary" onclick="showPage('subir')"><i class="fa-solid fa-plus"></i> Nueva factura</button>
+        <div class="bulk-actions" id="fact-bulk">
+          <span class="selected-count" id="fact-selected-count">0 seleccionadas</span>
+          <button class="btn btn-danger" onclick="bulkDelete('facturas')"><i class="fa-solid fa-trash"></i> Eliminar seleccionadas</button>
+          <button class="btn btn-ghost" onclick="clearSelection('facturas')">Cancelar</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="fact-table">
+          <thead><tr>
+            <th><input type="checkbox" id="fact-check-all" onchange="toggleAll('facturas')"></th>
+            <th>Fecha</th><th>Folio</th><th>Doc</th><th>Emisor / Receptor</th><th>RUT</th>
+            <th>Tipo</th><th>Neto</th><th>IVA</th><th>Total</th><th>Estado</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="fact-tbody"></tbody>
+          <tfoot id="fact-tfoot"></tfoot>
+        </table>
+        <!-- Barra de totales -->
+        <div id="fact-totales" style="display:none;margin-top:16px;background:var(--surface2);border-radius:10px;padding:16px 20px;">
+          <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+            <div id="fact-totales-ventas"></div>
+            <div id="fact-totales-compras"></div>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-secondary" onclick="exportarExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+              <button class="btn btn-secondary" onclick="exportarPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBIR FACTURA -->
+    <div class="page" id="page-subir">
+      <div class="page-header"><h1>Subir factura</h1><p>Cargá un PDF o imagen — la IA extrae los datos automáticamente</p></div>
+      <div style="max-width:600px">
+        <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <div id="upload-label">Hacé clic o arrastrá un PDF/imagen acá</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">PDF, JPG, PNG</div>
+        </div>
+        <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleFile(this)">
+        <div id="ai-status" style="margin-top:14px;display:none">
+          <div class="alert alert-info"><span class="spinner"></span> La IA está leyendo la factura...</div>
+        </div>
+        <div id="ai-result-box" style="display:none">
+          <div class="ai-result">
+            <p><i class="fa-solid fa-robot"></i> Datos extraídos por IA — revisá y confirmá:</p>
+            <div id="ai-chips"></div>
+          </div>
+          <div id="dup-warning" style="display:none" class="alert alert-warning" style="margin-top:10px">
+            <i class="fa-solid fa-triangle-exclamation"></i> <strong>Posible duplicado:</strong> ya existe una factura con este folio.
+          </div>
+          <div id="nc-warning" style="display:none" class="alert alert-warning" style="margin-top:10px">
+            <i class="fa-solid fa-rotate-left"></i> <strong>Nota de crédito detectada.</strong> Al guardar se anulará automáticamente la factura con folio <span id="nc-folio-ref"></span>.
+          </div>
+        </div>
+        <div id="invoice-form" style="display:none;margin-top:20px">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tipo de factura</label>
+              <select id="f-tipo" onchange="onTipoChange()">
+                <option value="venta">Venta (nosotros emitimos)</option>
+                <option value="compra">Compra (nos emiten)</option>
+                <option value="bh">BH - Boleta de Honorarios</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Folio</label>
+              <input type="text" id="f-folio" placeholder="Ej: 1234">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Fecha emisión</label>
+              <input type="date" id="f-fecha">
+            </div>
+            <div class="form-group">
+              <label>RUT emisor/receptor</label>
+              <input type="text" id="f-rut" placeholder="Ej: 76.962.937-8">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Razón social</label>
+            <input type="text" id="f-razon" placeholder="Nombre empresa o persona">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Monto neto (CLP)</label>
+              <input type="number" id="f-neto" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>IVA 19% (CLP)</label>
+              <input type="number" id="f-iva" placeholder="0" readonly style="opacity:0.6">
+            </div>
+          </div>
+          <div id="f-retencion-row" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(251,191,36,0.08);border-radius:8px;border:1px solid rgba(251,191,36,0.2);">
+            <span style="color:#fbbf24;font-size:13px"><i class="fa-solid fa-circle-info"></i> <strong>Boleta de Honorarios</strong> — Sin IVA. Retención 13%: <strong id="f-retencion-val">$0</strong></span>
+          </div>
+          <div class="form-row" style="display:none">
+            <div class="form-group" style="display:none">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Total (CLP)</label>
+            <input type="number" id="f-total" placeholder="0" readonly style="opacity:0.6">
+          </div>
+          <div class="form-group">
+            <label>Estado de pago</label>
+            <select id="f-estado">
+              <option value="pendiente">Pendiente</option>
+              <option value="pagada">Pagada</option>
+              <option value="parcial">Pago parcial</option>
+              <option value="anulada">Anulada</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notas / observaciones</label>
+            <textarea id="f-notas" rows="2" placeholder="Opcional..."></textarea>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn-primary" onclick="guardarFactura()"><i class="fa-solid fa-floppy-disk"></i> Guardar factura</button>
+            <button class="btn btn-ghost" onclick="resetSubirForm()">Limpiar</button>
+          </div>
+          <div id="save-status" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXTRACTO -->
+    <div class="page" id="page-extracto">
+      <div class="page-header"><h1>Extracto bancario</h1><p>Subí el extracto semanal del Itaú para conciliar con facturas</p></div>
+      <div class="month-filter-bar">
+        <label><i class="fa-solid fa-calendar"></i> Período:</label>
+        <select id="ext-year" onchange="renderExtracto()"></select>
+        <select id="ext-month" onchange="renderExtracto()">
+          <option value="">Todos</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <button class="btn-clear-filter" onclick="clearFilter('ext')">Limpiar</button>
+      </div>
+      <div style="max-width:600px;margin-bottom:24px">
+        <div class="upload-area" id="ext-upload-area" onclick="document.getElementById('ext-file-input').click()">
+          <i class="fa-solid fa-file-lines"></i>
+          <div>Subí el PDF del extracto semanal</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px">Itaú — PDF</div>
+        </div>
+        <input type="file" id="ext-file-input" accept=".pdf" style="display:none" onchange="handleExtracto(this)">
+        <div id="ext-ai-status" style="display:none;margin-top:10px">
+          <div class="alert alert-info"><span class="spinner"></span> Procesando extracto...</div>
+        </div>
+      </div>
+      <div class="table-toolbar">
+        <div class="bulk-actions" id="ext-bulk">
+          <span class="selected-count" id="ext-selected-count">0 seleccionados</span>
+          <button class="btn btn-danger" onclick="bulkDelete('extracto')"><i class="fa-solid fa-trash"></i> Eliminar seleccionados</button>
+          <button class="btn btn-ghost" onclick="clearSelection('extracto')">Cancelar</button>
+        </div>
+      </div>
+      <h3 style="font-size:14px;color:var(--text2);margin-bottom:10px">Movimientos</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" id="ext-check-all" onchange="toggleAll('extracto')"></th>
+            <th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Factura match</th><th>Estado</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="ext-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FACTORING -->
+    <div class="page" id="page-factoring">
+      <div class="page-header"><h1>Factoring GoCapital</h1><p>Cargá la simulación — la IA matchea con las facturas y genera la orden de pago</p></div>
+      <div class="month-filter-bar">
+        <label><i class="fa-solid fa-calendar"></i> Período:</label>
+        <select id="fac-year" onchange="renderFactoring()"></select>
+        <select id="fac-month" onchange="renderFactoring()">
+          <option value="">Todos</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <button class="btn-clear-filter" onclick="clearFilter('fac')">Limpiar</button>
+      </div>
+      <div style="max-width:600px;margin-bottom:24px">
+        <div class="upload-area" id="fac-upload-area" onclick="document.getElementById('fac-file-input').click()">
+          <i class="fa-solid fa-hand-holding-dollar"></i>
+          <div>Subí el PDF de simulación GoCapital</div>
+        </div>
+        <input type="file" id="fac-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleFactoring(this)">
+        <div id="fac-ai-status" style="display:none;margin-top:10px">
+          <div class="alert alert-info"><span class="spinner"></span> Analizando simulación de factoring...</div>
+        </div>
+        <div id="fac-result" style="display:none"></div>
+      </div>
+      <h3 style="font-size:14px;color:var(--text2);margin-bottom:10px">Órdenes de pago guardadas</h3>
+      <div class="table-toolbar">
+        <div class="bulk-actions" id="fac-bulk">
+          <span class="selected-count" id="fac-selected-count">0 seleccionadas</span>
+          <button class="btn btn-danger" onclick="bulkDelete('factoring')"><i class="fa-solid fa-trash"></i> Eliminar seleccionadas</button>
+          <button class="btn btn-ghost" onclick="clearSelection('factoring')">Cancelar</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" id="fac-check-all" onchange="toggleAll('factoring')"></th>
+            <th>Fecha</th><th>N° Orden</th><th>Facturas incluidas</th><th>Monto bruto</th><th>Costo factoring</th><th>Excedente</th><th>Líquido</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="fac-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TRANSFERENCIAS -->
+    <div class="page" id="page-transferencias">
+      <div class="page-header"><h1>Transferencias</h1><p>Comprobantes de pago de facturas de compra</p></div>
+      <div class="month-filter-bar">
+        <label><i class="fa-solid fa-calendar"></i> Período:</label>
+        <select id="trf-year" onchange="renderTransferencias()"></select>
+        <select id="trf-month" onchange="renderTransferencias()">
+          <option value="">Todos</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <button class="btn-clear-filter" onclick="clearFilter('trf')">Limpiar</button>
+      </div>
+      <div class="table-toolbar">
+        <button class="btn btn-primary" onclick="openTransferenciaModal()"><i class="fa-solid fa-plus"></i> Nueva transferencia</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Fecha</th><th>Proveedor</th><th>Folio factura</th><th>Monto</th><th>N° Transferencia</th><th>Comprobante</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="trf-tbody"></tbody></table>
+      </div>
+      <!-- Modal transferencia -->
+      <div id="trf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
+        <div style="background:var(--surface1);border-radius:16px;padding:32px;width:500px;max-width:95vw">
+          <h2 style="margin-bottom:20px">Nueva transferencia</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Fecha</label>
+              <input type="date" id="trf-fecha">
+            </div>
+            <div class="form-group">
+              <label>Medio de pago</label>
+              <select id="trf-medio">
+                <option value="transferencia">Transferencia bancaria</option>
+                <option value="debito">Tarjeta débito</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>N° Operación / Referencia (opcional)</label>
+            <input type="text" id="trf-numero" placeholder="Ej: 12345678">
+          </div>
+          <div class="form-group">
+            <label>Factura de compra</label>
+            <select id="trf-folio-select"></select>
+          </div>
+          <div class="form-group">
+            <label>Monto transferido (CLP)</label>
+            <input type="number" id="trf-monto" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Comprobante (PDF o imagen)</label>
+            <input type="file" id="trf-archivo" accept=".pdf,image/*" style="padding:8px">
+          </div>
+          <div class="form-group">
+            <label>Notas</label>
+            <input type="text" id="trf-notas" placeholder="Opcional">
+          </div>
+          <div id="trf-save-status"></div>
+          <div style="display:flex;gap:12px;margin-top:16px">
+            <button class="btn btn-primary" onclick="guardarTransferencia()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+            <button class="btn btn-secondary" onclick="closeTrfModal()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GASTOS OPERATIVOS -->
+    <div class="page" id="page-gastos">
+      <div class="page-header"><h1>Gastos operativos</h1><p>Gastos del día a día sin comprobante obligatorio</p></div>
+      <div class="month-filter-bar">
+        <label><i class="fa-solid fa-calendar"></i> Período:</label>
+        <select id="gto-year" onchange="renderGastos()"></select>
+        <select id="gto-month" onchange="renderGastos()">
+          <option value="">Todos</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="gto-cat" onchange="renderGastos()">
+          <option value="">Todas las categorías</option>
+          <option value="transporte">Transporte</option>
+          <option value="alimentacion">Alimentación</option>
+          <option value="papeleria">Papelería</option>
+          <option value="servicios">Servicios</option>
+          <option value="otros">Otros</option>
+        </select>
+        <button class="btn-clear-filter" onclick="clearFilter('gto')">Limpiar</button>
+      </div>
+      <div class="table-toolbar">
+        <button class="btn btn-primary" onclick="openGastoModal()"><i class="fa-solid fa-plus"></i> Nuevo gasto</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr>
+          <th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Monto</th><th>Quién</th><th>Notas</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="gto-tbody"></tbody></table>
+      </div>
+      <div id="gto-total-bar" style="display:none;margin-top:16px;background:var(--surface2);border-radius:10px;padding:16px 20px;">
+        <span style="color:var(--text2);font-size:13px">Total gastos:</span>
+        <strong id="gto-total" style="margin-left:12px;font-size:18px;color:var(--red)"></strong>
+      </div>
+      <!-- Modal gasto -->
+      <div id="gto-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+        <div style="background:var(--surface1);border-radius:16px;padding:32px;width:460px;max-width:95vw">
+          <h2 style="margin-bottom:20px">Nuevo gasto operativo</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Fecha</label>
+              <input type="date" id="gto-fecha">
+            </div>
+            <div class="form-group">
+              <label>Categoría</label>
+              <select id="gto-categoria">
+                <option value="transporte">Transporte</option>
+                <option value="alimentacion">Alimentación</option>
+                <option value="papeleria">Papelería</option>
+                <option value="servicios">Servicios</option>
+                <option value="otros">Otros</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Descripción</label>
+            <input type="text" id="gto-desc" placeholder="Ej: Uber reunión cliente">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Monto (CLP)</label>
+              <input type="number" id="gto-monto" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>Quién</label>
+              <select id="gto-quien">
+                <option value="Carla">Carla</option>
+                <option value="Lu">Lu</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notas (opcional)</label>
+            <input type="text" id="gto-notas" placeholder="">
+          </div>
+          <div id="gto-save-status"></div>
+          <div style="display:flex;gap:12px;margin-top:16px">
+            <button class="btn btn-primary" onclick="guardarGasto()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+            <button class="btn btn-secondary" onclick="closeGtoModal()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUENTA CORRIENTE PROVEEDORES -->
+    <div class="page" id="page-cuentacorriente">
+      <div class="page-header"><h1>Cuenta corriente proveedores</h1><p>Saldo por proveedor según facturas y pagos</p></div>
+      <div class="month-filter-bar">
+        <label>Proveedor:</label>
+        <input type="text" id="cc-buscar" placeholder="Buscar proveedor..." oninput="renderCuentaCorriente()" style="padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-size:13px;min-width:220px">
+        <button class="btn-clear-filter" onclick="document.getElementById('cc-buscar').value='';renderCuentaCorriente()">Limpiar</button>
+      </div>
+      <div id="cc-content" style="margin-top:16px"></div>
+    </div>
+
+    <!-- MAESTRO -->
+    <div class="page" id="page-maestro">
+      <div class="page-header"><h1>Maestro de empresas</h1><p>RUTs y razones sociales frecuentes</p></div>
+      <div class="table-toolbar">
+        <button class="btn btn-primary" onclick="openMaestroModal()"><i class="fa-solid fa-plus"></i> Agregar empresa</button>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>RUT</th><th>Razón social</th><th>Tipo</th><th>Notas</th><th>Acciones</th></tr></thead>
+        <tbody id="maestro-tbody"></tbody></table>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- MODAL EDITAR FACTURA -->
+<div class="modal-overlay" id="modal-edit-factura">
+  <div class="modal">
+    <h2><i class="fa-solid fa-pen-to-square"></i> Editar factura</h2>
+    <input type="hidden" id="edit-f-id">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Tipo de factura</label>
+        <select id="edit-f-tipo">
+          <option value="venta">Venta</option>
+          <option value="compra">Compra</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Estado de pago</label>
+        <select id="edit-f-estado">
+          <option value="pendiente">Pendiente</option>
+          <option value="pagada">Pagada</option>
+          <option value="parcial">Pago parcial</option>
+          <option value="factoring">En factoring</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notas / observaciones</label>
+      <textarea id="edit-f-notas" rows="3"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-factura')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEditFactura()"><i class="fa-solid fa-floppy-disk"></i> Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MAESTRO -->
+<div class="modal-overlay" id="modal-maestro">
+  <div class="modal">
+    <h2>Empresa / proveedor</h2>
+    <input type="hidden" id="m-id">
+    <div class="form-group"><label>RUT</label><input type="text" id="m-rut" placeholder="76.962.937-8"></div>
+    <div class="form-group"><label>Razón social</label><input type="text" id="m-razon"></div>
+    <div class="form-group">
+      <label>Tipo habitual</label>
+      <select id="m-tipo"><option value="cliente">Cliente (venta)</option><option value="proveedor">Proveedor (compra)</option></select>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="m-notas" rows="2"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-maestro')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMaestro()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ORDEN DE PAGO -->
+<div class="modal-overlay" id="modal-orden-pago">
+  <div class="modal" style="width:600px">
+    <h2><i class="fa-solid fa-file-invoice-dollar"></i> Orden de Pago — GoCapital</h2>
+    <div id="orden-pago-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-orden-pago')">Cerrar</button>
+      <button class="btn btn-primary" onclick="downloadOrdenPago()"><i class="fa-solid fa-file-pdf"></i> Descargar PDF</button>
+      <button class="btn btn-success" onclick="confirmarOrdenPago()"><i class="fa-solid fa-check"></i> Confirmar y guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const SHEET_ID = '1yRwvmcHsT4w4pDOlooal_pZ78jNO5EpT6S_MXy8tXm0';
+const GOOGLE_API_KEY = 'AIzaSyALTPm15d1pAhago5d8KNMsUJPHCmVN938';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbybBDFe7fXaIg7g1F-Nfpz-p5A3a2dkkobTDptK4M_sWUNsEGl-bp4mYSXXlwV6is88/exec';
+const RUT_AGENCIA = '76962937-8'; // WTF Advertising SPA (normalizado sin puntos)
+const PINS = { '1234': 'admin', '5678': 'operadora' };
+const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// ==================== STATE ====================
+let currentUser = null;
+let pinBuffer = '';
+let facturas = [];
+let extracto = [];
+let factoringOrdenes = [];
+let maestro = [];
+let pendingOrdenPago = null;
+
+// ==================== PIN ====================
+function pinPress(n) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += n;
+  updatePinDisplay();
+}
+function pinClear() {
+  pinBuffer = pinBuffer.slice(0,-1);
+  updatePinDisplay();
+}
+function updatePinDisplay() {
+  const d = document.getElementById('pin-display');
+  d.textContent = '● '.repeat(pinBuffer.length) + '_ '.repeat(4-pinBuffer.length).trim();
+}
+function pinEnter() {
+  const role = PINS[pinBuffer];
+  if (role) {
+    currentUser = role;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('user-label').textContent = role === 'admin' ? 'Lu (Admin)' : 'Carla';
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = role === 'admin' ? '' : 'none');
+    initYearSelects();
+    loadAllData();
+  } else {
+    document.getElementById('pin-error').textContent = 'PIN incorrecto. Intentá de nuevo.';
+    pinBuffer = '';
+    updatePinDisplay();
+    setTimeout(() => document.getElementById('pin-error').textContent = '', 2000);
+  }
+}
+function logout() {
+  pinBuffer = ''; currentUser = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('pin-display').textContent = '_ _ _ _';
+}
+
+async function refreshData() {
+  const icon = document.getElementById('refresh-icon');
+  if (icon) { icon.classList.add('fa-spin'); }
+  try {
+    await loadAllData();
+    // Rerenderizar la página activa
+    const active = document.querySelector('.nav-item.active');
+    if (active) {
+      const match = active.getAttribute('onclick')?.match(/'(\w+)'/);
+      if (match) showPage(match[1]);
+    }
+  } catch(e) { console.error('Refresh error:', e); }
+  if (icon) { icon.classList.remove('fa-spin'); }
+}
+
+// ==================== NAVIGATION ====================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+  if (id === 'transferencias') renderTransferencias();
+  if (id === 'gastos') renderGastos();
+  if (id === 'cuentacorriente') renderCuentaCorriente();
+  if (id === 'facturas') renderFacturas();
+  if (id === 'extracto') renderExtracto();
+  if (id === 'factoring') renderFactoring();
+  if (id === 'maestro') renderMaestro();
+}
+
+// ==================== YEAR SELECTS ====================
+function initYearSelects() {
+  const year = new Date().getFullYear();
+  const years = [year-1, year, year+1];
+  ['dash-year','fact-year','ext-year','fac-year','trf-year','gto-year'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Todos</option>';
+    years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; if (y === year) o.selected = true; sel.appendChild(o); });
+  });
+}
+
+function clearFilter(prefix) {
+  const y = document.getElementById(prefix+'-year');
+  const m = document.getElementById(prefix+'-month');
+  const t = document.getElementById(prefix+'-tipo');
+  const d = document.getElementById(prefix+'-doc');
+  const e = document.getElementById(prefix+'-estado');
+  if (y) y.value = '';
+  if (m) m.value = '';
+  if (t) t.value = '';
+  if (d) d.value = '';
+  if (e) e.value = '';
+  if (prefix === 'dash') renderDashboard();
+  if (prefix === 'fact') renderFacturas();
+  if (prefix === 'ext') renderExtracto();
+  if (prefix === 'fac') renderFactoring();
+}
+
+function matchesFilter(dateStr, yearSel, monthSel) {
+  if (!dateStr) return true;
+  // Tomar solo la parte de fecha (YYYY-MM-DD) para evitar problemas de timezone
+  const datePart = String(dateStr).substring(0, 10);
+  const parts = datePart.split('-');
+  const y = document.getElementById(yearSel)?.value;
+  const m = document.getElementById(monthSel)?.value;
+  if (y && parts[0] != y) return false;
+  if (m && parseInt(parts[1]) != m) return false;
+  return true;
+}
+
+// ==================== GOOGLE SHEETS (via Vercel proxy) ====================
+const SHEETS_PROXY = '/api/sheets';
+
+async function sheetsRead(range) {
+  const sheetName = range.includes('!') ? range.split('!')[0] : range;
+  const url = `${SHEETS_PROXY}?sheetId=${SHEET_ID}&sheetName=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  return d.values || [];
+}
+
+async function sheetsWrite(range, values) {
+  const r = await fetch(SHEETS_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sheetId: SHEET_ID, action: 'write', range, values })
+  });
+  return r.json();
+}
+
+async function sheetsAppend(sheetName, values) {
+  const r = await fetch(SHEETS_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action: 'append', values })
+  });
+  return r.json();
+}
+
+async function sheetsDelete(sheetName, id) {
+  const r = await fetch(SHEETS_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action: 'delete', id })
+  });
+  return r.json();
+}
+
+async function sheetsDeleteMultiple(sheetName, ids) {
+  if (!ids.length) return;
+  const r = await fetch(SHEETS_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action: 'deleteMultiple', ids })
+  });
+  return r.json();
+}
+
+async function sheetsUpdateById(sheetName, id, col, value) {
+  const r = await fetch(SHEETS_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action: 'updateById', id, col, value })
+  });
+  return r.json();
+}
+
+async function loadAllData() {
+  try {
+    const [fRows, eRows, facRows, mRows, trfRows, gtoRows] = await Promise.all([
+      sheetsRead('FACTURAS!A2:L1000'),
+      sheetsRead('EXTRACTO!A2:J1000'),
+      sheetsRead('FACTORING!A2:K1000'),
+      sheetsRead('MAESTRO!A2:E1000'),
+      sheetsRead('TRANSFERENCIAS!A2:G1000'),
+      sheetsRead('GASTOS!A2:G1000')
+    ]);
+    facturas = fRows.filter(r => r[0] && String(r[0]).trim().match(/^F\d+/)).map(r => ({ id: r[0]||'', fecha: r[1]||'', folio: r[2]||'', rut: r[3]||'', razon: r[4]||'', tipo: String(r[5]||'compra').toLowerCase().trim(), neto: parseFloat(r[6])||0, iva: parseFloat(r[7])||0, total: parseFloat(r[8])||0, estado: r[9]||'pendiente', notas: r[10]||'', row: r[11]||'' }));
+    extracto = eRows.filter(r => r[0] && String(r[0]).trim().match(/^E\d+/)).map(r => ({ id: r[0]||'', fecha: r[1]||'', descripcion: r[2]||'', tipo: r[3]||'', monto: parseFloat(r[4])||0, matchFolio: r[5]||'', estado: r[6]||'sin_match', notas: r[7]||'', row: r[8]||'' }));
+    factoringOrdenes = facRows.filter(r => r[0] && String(r[0]).trim().match(/^OP\d+/)).map(r => ({ id: r[0]||'', fecha: r[1]||'', nOrden: r[2]||'', folios: r[3]||'', montoBruto: parseFloat(r[4])||0, costoFactoring: parseFloat(r[5])||0, excedente: parseFloat(r[6])||0, liquido: parseFloat(r[7])||0, notas: r[8]||'' }));
+    maestro = mRows.map(r => ({ id: r[0]||'', rut: r[1]||'', razon: r[2]||'', tipo: r[3]||'', notas: r[4]||'' }));
+    transferencias = trfRows.filter(r => r[0] && String(r[0]).trim().match(/^T\d+/)).map(r => ({ id: r[0]||'', fecha: r[1]||'', folioFactura: r[2]||'', proveedor: r[3]||'', monto: parseFloat(r[4])||0, numero: r[5]||'', notas: r[6]||'' }));
+    gastos = gtoRows.filter(r => r[0] && String(r[0]).trim().match(/^G\d+/)).map(r => ({ id: r[0]||'', fecha: r[1]||'', descripcion: r[2]||'', categoria: r[3]||'', monto: parseFloat(r[4])||0, quien: r[5]||'', notas: r[6]||'' }));
+    renderDashboard();
+  } catch(e) {
+    console.error('Error cargando datos:', e);
+  }
+}
+
+// ==================== DASHBOARD ====================
+let dashChart = null;
+function renderDashboard() {
+  const filtered = facturas.filter(f => matchesFilter(f.fecha, 'dash-year', 'dash-month'));
+  const ventas = filtered.filter(f => f.tipo === 'venta' && f.estado !== 'anulada');
+  const compras = filtered.filter(f => (f.tipo === 'compra') && f.estado !== 'anulada');
+  const bhs = filtered.filter(f => f.tipo === 'bh' && f.estado !== 'anulada');
+  const netoVentas = ventas.reduce((a,f) => a+f.neto, 0);
+  const netoCompras = compras.reduce((a,f) => a+f.neto, 0);
+  const pendientesVenta = ventas.filter(f => f.estado === 'pendiente').reduce((a,f) => a+f.neto, 0);
+  const pendientesCompra = compras.filter(f => f.estado === 'pendiente').reduce((a,f) => a+f.neto, 0);
+  const tc = parseFloat(document.getElementById('dash-tc')?.value) || 890;
+  const fmtUSD = n => 'USD ' + Math.round(Math.abs(n)/tc).toLocaleString('es-CL');
+
+  // IVA a pagar
+  const ivaDebito = ventas.reduce((a,f) => a+f.iva, 0);
+  const ivaCredito = compras.reduce((a,f) => a+f.iva, 0); // BH no tiene IVA
+  const ivaNeto = ivaDebito - ivaCredito;
+  const mesActual = document.getElementById('dash-month')?.value;
+  const mesNombre = mesActual ? ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(mesActual)] : '';
+  const ivaDiv = document.getElementById('dash-iva');
+  if (ivaDiv && ivaDebito > 0) {
+    ivaDiv.style.display = 'block';
+    ivaDiv.innerHTML = `
+      <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:14px 20px;display:flex;gap:32px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:12px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:1px">IVA ${mesNombre||'período seleccionado'}</div>
+        <div><div style="font-size:11px;color:var(--text2)">Débito fiscal (ventas)</div><div style="font-weight:700">${fmt(ivaDebito)}</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Crédito fiscal (compras)</div><div style="font-weight:700;color:var(--green)">-${fmt(ivaCredito)}</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">IVA a pagar</div><div style="font-size:18px;font-weight:800;color:${ivaNeto>0?'var(--red)':'var(--green)'}">      ${fmt(ivaNeto)}</div></div>
+        ${mesActual ? `<div style="font-size:11px;color:var(--text2)">Vence el <strong>20 de ${['','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre','Enero'][parseInt(mesActual)]}</strong></div>` : ''}
+      </div>`;
+  } else if (ivaDiv) {
+    ivaDiv.style.display = 'none';
+  }
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Ventas netas</div>
+      <div class="value green">${fmt(netoVentas)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(netoVentas)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Compras netas</div>
+      <div class="value red">${fmt(netoCompras)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(netoCompras)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Por cobrar (neto)</div>
+      <div class="value blue">${fmt(pendientesVenta)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(pendientesVenta)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Por pagar (neto)</div>
+      <div class="value yellow">${fmt(pendientesCompra)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(pendientesCompra)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Margen bruto</div>
+      <div class="value" style="color:${netoVentas-netoCompras>=0?'var(--green)':'var(--red)'}">${fmt(netoVentas-netoCompras)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${fmtUSD(netoVentas-netoCompras)}</div>
+    </div>
+  `;
+
+  // Gráfico por cliente
+  const porCliente = {};
+  ventas.forEach(f => {
+    const k = f.razon || 'Sin nombre';
+    porCliente[k] = (porCliente[k]||0) + f.neto;
+  });
+  const clientesOrdenados = Object.entries(porCliente).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const canvas = document.getElementById('dash-chart-clientes');
+  if (canvas && clientesOrdenados.length) {
+    if (dashChart) { dashChart.destroy(); dashChart = null; }
+    const colors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#3b82f6','#a855f7','#ec4899','#14b8a6'];
+    dashChart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: clientesOrdenados.map(([k]) => k.length > 18 ? k.substring(0,18)+'...' : k),
+        datasets: [{ data: clientesOrdenados.map(([,v]) => v), backgroundColor: colors, borderRadius: 4 }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { callback: v => '$'+Math.round(v/1000000)+'M', color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  // Pendientes de cobro
+  const pending = ventas.filter(f => f.estado === 'pendiente').slice(0,6);
+  document.getElementById('dash-pending').innerHTML = pending.length ? pending.map(f => `
+    <tr><td>${f.folio}</td><td>${(f.razon||'—').substring(0,22)}</td><td><strong>${fmt(f.neto)}</strong></td></tr>
+  `).join('') : '<tr><td colspan="3" class="empty-state">Sin pendientes</td></tr>';
+}
+
+// ==================== FACTURAS ====================
+function renderFacturas() {
+  const year = document.getElementById('fact-year')?.value;
+  const month = document.getElementById('fact-month')?.value;
+  const tipo = document.getElementById('fact-tipo')?.value;
+
+  let filtered = facturas.filter(f => {
+    if (!matchesFilter(f.fecha, 'fact-year', 'fact-month')) return false;
+    if (tipo && f.tipo !== tipo) return false;
+    // Filtro por tipo de documento
+    const docFilter = document.getElementById('fact-doc')?.value;
+    if (docFilter) {
+      const isNC = f.notas && f.notas.startsWith('NC -');
+      const isBH = f.tipo === 'bh';
+      const docTipo = isNC ? 'NC' : isBH ? 'BH' : 'FA';
+      if (docTipo !== docFilter) return false;
+    }
+    // Filtro por estado
+    const estadoFilter = document.getElementById('fact-estado')?.value;
+    if (estadoFilter && f.estado !== estadoFilter) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('fact-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><i class="fa-solid fa-file-invoice"></i><br>No hay facturas. <a href="#" onclick="showPage('subir')" style="color:var(--accent2)">Subir una</a></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(f => {
+    const isNC = f.notas && f.notas.startsWith('NC -');
+    const isAnulada = f.estado === 'anulada';
+        let docLabel;
+    if (isNC) docLabel = '<span style="background:rgba(239,68,68,0.15);color:#f87171;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">NC</span>';
+    else if (f.tipo === 'bh') docLabel = '<span style="background:rgba(251,191,36,0.15);color:#fbbf24;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">BH</span>';
+    else docLabel = '<span style="background:rgba(99,102,241,0.15);color:#818cf8;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">FA</span>';
+    const rowStyle = isAnulada ? 'opacity:0.5;text-decoration:line-through;' : '';
+    const montoStyle = isNC ? 'color:var(--red)' : '';
+    return `
+    <tr data-id="${f.id}" class="${f._selected?'selected':''}" style="${rowStyle}">
+      <td class="checkbox-cell"><input type="checkbox" onchange="toggleSelect('facturas','${f.id}',this)" ${f._selected?'checked':''}></td>
+      <td>${String(f.fecha).substring(0,10)}</td>
+      <td><strong>${f.folio}</strong></td>
+      <td>${docLabel}</td>
+      <td>${f.razon||'—'}</td>
+      <td style="color:var(--text2);font-size:12px">${f.rut}</td>
+      <td><span class="badge badge-${f.tipo}">${f.tipo}</span></td>
+      <td style="${montoStyle}">${fmt(f.neto)}</td>
+      <td style="${montoStyle}">${fmt(f.iva)}</td>
+      <td style="${montoStyle}"><strong>${fmt(f.total)}</strong></td>
+      <td><span class="badge badge-${f.estado}">${f.estado}</span></td>
+      <td class="actions-cell">
+        <button class="icon-btn edit" title="Editar" onclick="openEditFactura('${f.id}')"><i class="fa-solid fa-pen"></i></button>
+        <button class="icon-btn del" title="Eliminar" onclick="deleteFactura('${f.id}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Totales dinámicos
+  const activas = filtered.filter(f => f.estado !== 'anulada');
+  const ventas = activas.filter(f => f.tipo === 'venta');
+  const compras = activas.filter(f => f.tipo === 'compra');
+  const tot = arr => ({ neto: arr.reduce((s,f)=>s+f.neto,0), iva: arr.reduce((s,f)=>s+f.iva,0), total: arr.reduce((s,f)=>s+f.total,0) });
+  const tv = tot(ventas), tc = tot(compras);
+  const totDiv = document.getElementById('fact-totales');
+  const mostrarVentas = ventas.length > 0;
+  const mostrarCompras = compras.length > 0;
+  totDiv.style.display = (mostrarVentas || mostrarCompras) ? 'block' : 'none';
+  const tcFact = parseFloat(document.getElementById('dash-tc')?.value) || 890;
+  const fmtUSD = n => 'USD ' + Math.round(Math.abs(n)/tcFact).toLocaleString('es-CL');
+  const bloque = (label, color, t) => `
+      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">${label}</div>
+      <div style="display:flex;gap:24px;">
+        <div><div style="font-size:11px;color:var(--text2)">Neto</div><div style="font-weight:700">${fmt(t.neto)}</div><div style="font-size:11px;color:var(--text2)">${fmtUSD(t.neto)}</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">IVA</div><div style="font-weight:700">${fmt(t.iva)}</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Total</div><div style="font-size:16px;font-weight:800;color:${color}">${fmt(t.total)}</div><div style="font-size:11px;color:var(--text2)">${fmtUSD(t.total)}</div></div>
+      </div>
+    </div>`;
+  document.getElementById('fact-totales-ventas').innerHTML = mostrarVentas ? bloque('Ventas', 'var(--green)', tv) : '';
+  document.getElementById('fact-totales-compras').innerHTML = mostrarCompras ? bloque('Compras', 'var(--red)', tc) : '';
+  // Guardar filtered para exportar
+  window._filteredFacturas = filtered;
+}
+
+function exportarExcel() {
+  const data = (window._filteredFacturas || []).map(f => ({
+    'Fecha': f.fecha,
+    'Folio': f.folio,
+    'Doc': (f.notas && f.notas.startsWith('NC -')) ? 'NC' : 'FA',
+    'Razón Social': f.razon,
+    'RUT': f.rut,
+    'Tipo': f.tipo,
+    'Neto': f.neto,
+    'IVA': f.iva,
+    'Total': f.total,
+    'Estado': f.estado,
+    'Notas': f.notas
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Facturas');
+  XLSX.writeFile(wb, `WTF_Chile_Facturas_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function exportarPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const filtered = window._filteredFacturas || [];
+  
+  doc.setFontSize(14);
+  doc.text('WTF Chile — Facturas', 14, 15);
+  doc.setFontSize(9);
+  doc.text(`Exportado: ${new Date().toLocaleDateString('es-CL')}  |  ${filtered.length} registros`, 14, 22);
+
+  const rows = filtered.map(f => [
+    f.fecha, f.folio,
+    (f.notas && f.notas.startsWith('NC -')) ? 'NC' : 'FA',
+    (f.razon||'').substring(0,28),
+    f.tipo,
+    fmt(f.neto), fmt(f.iva), fmt(f.total),
+    f.estado
+  ]);
+
+  doc.autoTable({
+    startY: 27,
+    head: [['Fecha','Folio','Doc','Razón Social','Tipo','Neto','IVA','Total','Estado']],
+    body: rows,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [99, 102, 241] },
+    alternateRowStyles: { fillColor: [245, 245, 250] }
+  });
+
+  // Totales al pie
+  const activas = filtered.filter(f => f.estado !== 'anulada');
+  const ventas = activas.filter(f => f.tipo === 'venta');
+  const compras = activas.filter(f => f.tipo === 'compra');
+  const tot = arr => arr.reduce((s,f) => s+f.total, 0);
+  const finalY = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'bold');
+  if (ventas.length) doc.text(`Total Ventas: ${fmt(tot(ventas))}`, 14, finalY);
+  if (compras.length) doc.text(`Total Compras: ${fmt(tot(compras))}`, 14, finalY + (ventas.length ? 6 : 0));
+  
+  doc.save(`WTF_Chile_Facturas_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+function openEditFactura(id) {
+  const f = facturas.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('edit-f-id').value = id;
+  document.getElementById('edit-f-tipo').value = f.tipo;
+  document.getElementById('edit-f-estado').value = f.estado;
+  document.getElementById('edit-f-notas').value = f.notas||'';
+  openModal('modal-edit-factura');
+}
+
+async function saveEditFactura() {
+  const id = document.getElementById('edit-f-id').value;
+  const f = facturas.find(x => x.id === id);
+  if (!f) return;
+  f.tipo = document.getElementById('edit-f-tipo').value;
+  f.estado = document.getElementById('edit-f-estado').value;
+  f.notas = document.getElementById('edit-f-notas').value;
+  // Update in Sheets: find row by ID
+  await updateFacturaInSheet(f);
+  closeModal('modal-edit-factura');
+  renderFacturas();
+  renderDashboard();
+}
+
+async function updateFacturaInSheet(f) {
+  try {
+    const rows = await sheetsRead('FACTURAS!A2:A1000');
+    const idx = rows.findIndex(r => r[0] === f.id);
+    if (idx === -1) return;
+    const rowNum = idx + 2;
+    await sheetsWrite(`FACTURAS!F${rowNum}`, [[f.tipo]]);
+    await sheetsWrite(`FACTURAS!J${rowNum}`, [[f.estado]]);
+    await sheetsWrite(`FACTURAS!K${rowNum}`, [[f.notas]]);
+  } catch(e) { console.error(e); }
+}
+
+async function deleteFactura(id) {
+  if (!confirm('¿Eliminar esta factura?')) return;
+  await sheetsDelete('FACTURAS', id);
+  facturas = facturas.filter(f => f.id !== id);
+  renderFacturas();
+  renderDashboard();
+}
+
+function facturasToRows() {
+  return facturas.map(f => [f.id, f.fecha, f.folio, f.rut, f.razon, f.tipo, f.neto, f.iva, f.total, f.estado, f.notas]);
+}
+
+// ==================== BULK SELECTION ====================
+function toggleSelect(section, id, cb) {
+  const arr = section === 'facturas' ? facturas : section === 'extracto' ? extracto : factoringOrdenes;
+  const item = arr.find(x => x.id === id);
+  if (item) item._selected = cb.checked;
+  updateBulkBar(section);
+}
+
+function toggleAll(section) {
+  const allCb = document.getElementById(section === 'facturas' ? 'fact-check-all' : section === 'extracto' ? 'ext-check-all' : 'fac-check-all');
+  const arr = section === 'facturas' ? facturas : section === 'extracto' ? extracto : factoringOrdenes;
+  arr.forEach(x => x._selected = allCb.checked);
+  if (section === 'facturas') renderFacturas();
+  if (section === 'extracto') renderExtracto();
+  if (section === 'factoring') renderFactoring();
+  updateBulkBar(section);
+}
+
+function updateBulkBar(section) {
+  const arr = section === 'facturas' ? facturas : section === 'extracto' ? extracto : factoringOrdenes;
+  const count = arr.filter(x => x._selected).length;
+  const bulkEl = document.getElementById(section === 'facturas' ? 'fact-bulk' : section === 'extracto' ? 'ext-bulk' : 'fac-bulk');
+  const countEl = document.getElementById(section === 'facturas' ? 'fact-selected-count' : section === 'extracto' ? 'ext-selected-count' : 'fac-selected-count');
+  bulkEl.classList.toggle('visible', count > 0);
+  countEl.textContent = `${count} seleccionada${count !== 1 ? 's' : ''}`;
+}
+
+function clearSelection(section) {
+  const arr = section === 'facturas' ? facturas : section === 'extracto' ? extracto : factoringOrdenes;
+  arr.forEach(x => x._selected = false);
+  updateBulkBar(section);
+  if (section === 'facturas') renderFacturas();
+  if (section === 'extracto') renderExtracto();
+  if (section === 'factoring') renderFactoring();
+}
+
+async function bulkDelete(section) {
+  const arr = section === 'facturas' ? facturas : section === 'extracto' ? extracto : factoringOrdenes;
+  const count = arr.filter(x => x._selected).length;
+  if (!count || !confirm(`¿Eliminar ${count} elemento${count>1?'s':''}?`)) return;
+  if (section === 'facturas') {
+    const ids = facturas.filter(x => x._selected).map(x => x.id);
+    await sheetsDeleteMultiple('FACTURAS', ids);
+    facturas = facturas.filter(x => !x._selected);
+    renderFacturas(); renderDashboard();
+  }
+  if (section === 'extracto') {
+    const ids = extracto.filter(x => x._selected).map(x => x.id);
+    await sheetsDeleteMultiple('EXTRACTO', ids);
+    extracto = extracto.filter(x => !x._selected);
+    renderExtracto();
+  }
+  if (section === 'factoring') {
+    const ids = factoringOrdenes.filter(x => x._selected).map(x => x.id);
+    await sheetsDeleteMultiple('FACTORING', ids);
+    factoringOrdenes = factoringOrdenes.filter(x => !x._selected);
+    renderFactoring();
+  }
+}
+
+async function rebuildSheet(sheetName, rows) {
+  try {
+    // Usar clearAndWrite para borrar todo y reescribir de una sola vez
+    const r = await fetch(SHEETS_PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sheetId: SHEET_ID, sheetName, action: 'clearAndWrite', values: rows })
+    });
+    return r.json();
+  } catch(e) { console.error(e); }
+}
+
+// ==================== SUBIR FACTURA ====================
+function dragOver(e) { e.preventDefault(); document.getElementById('upload-area').classList.add('dragover'); }
+function dragLeave(e) { document.getElementById('upload-area').classList.remove('dragover'); }
+function dropFile(e) { e.preventDefault(); dragLeave(e); if (e.dataTransfer.files[0]) processInvoiceFile(e.dataTransfer.files[0]); }
+
+function handleFile(input) {
+  if (input.files[0]) processInvoiceFile(input.files[0]);
+}
+
+async function processInvoiceFile(file) {
+  document.getElementById('upload-label').textContent = file.name;
+  document.getElementById('ai-status').style.display = 'block';
+  document.getElementById('ai-result-box').style.display = 'none';
+  document.getElementById('invoice-form').style.display = 'none';
+
+  try {
+    const base64 = await fileToBase64(file);
+    const isPdf = file.type === 'application/pdf';
+    const prompt = `Sos un asistente experto en facturas chilenas. Extraé los siguientes datos de este documento:
+- numero_folio: número de folio o factura
+- fecha: fecha de emisión (formato YYYY-MM-DD)
+- rut_emisor: RUT del emisor (con puntos y guión, ej: 76.962.937-8)
+- razon_emisor: razón social del emisor
+- rut_receptor: RUT del receptor
+- razon_receptor: razón social del receptor
+- monto_neto: monto neto en CLP (solo número)
+- iva: monto IVA en CLP (solo número)
+- total: monto total en CLP (solo número)
+- es_nota_credito: true si el documento es una Nota de Crédito (NC), false en otro caso
+- es_boleta_honorarios: true si el documento es una Boleta de Honorarios (BH), false en otro caso. Las BH no tienen IVA y tienen retención del 13%.
+- folio_referencia: si es NC, el número de folio de la factura que anula (solo número como string, null si no aplica)
+
+Respondé SOLO con JSON, sin texto adicional. Ejemplo factura: {"numero_folio":"1234","fecha":"2026-01-15","rut_emisor":"76.962.937-8","razon_emisor":"WTF Advertising SPA","rut_receptor":"12.345.678-9","razon_receptor":"Cliente SA","monto_neto":1000000,"iva":190000,"total":1190000,"es_nota_credito":false,"folio_referencia":null}
+Ejemplo NC: {"numero_folio":"45","fecha":"2026-03-10","rut_emisor":"76.962.937-8","razon_emisor":"WTF Advertising SPA","rut_receptor":"12.345.678-9","razon_receptor":"Cliente SA","monto_neto":1000000,"iva":190000,"total":1190000,"es_nota_credito":true,"folio_referencia":"1234"}`;
+
+    const body = { model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: [
+      isPdf ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+             : { type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } },
+      { type: 'text', text: prompt }
+    ]}]};
+
+    const resp = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await resp.json();
+    const text = data.content[0].text.replace(/```json|```/g,'').trim();
+    const extracted = JSON.parse(text);
+
+    document.getElementById('ai-status').style.display = 'none';
+    document.getElementById('ai-result-box').style.display = 'block';
+    document.getElementById('invoice-form').style.display = 'block';
+
+    // Determinar tipo basado en RUT
+    const rutEmisorNorm = normalizeRut(extracted.rut_emisor || '');
+    const rutAgenciaNorm = normalizeRut(RUT_AGENCIA);
+    const tipoDetectado = rutEmisorNorm === rutAgenciaNorm ? 'venta' : 'compra';
+
+    document.getElementById('ai-chips').innerHTML = Object.entries(extracted).map(([k,v]) => `<span class="ai-chip"><strong>${k}:</strong> ${v}</span>`).join(' ');
+    document.getElementById('ai-chips').innerHTML += `<span class="ai-chip" style="background:rgba(${tipoDetectado==='venta'?'34,197,94':'239,68,68'},0.2)"><strong>tipo detectado:</strong> ${tipoDetectado}</span>`;
+
+    // Rellenar form
+    document.getElementById('f-tipo').value = extracted.es_boleta_honorarios ? 'bh' : tipoDetectado;
+    onTipoChange();
+    document.getElementById('f-folio').value = extracted.numero_folio || '';
+    document.getElementById('f-fecha').value = extracted.fecha || '';
+    document.getElementById('f-rut').value = tipoDetectado === 'venta' ? (extracted.rut_receptor || '') : (extracted.rut_emisor || '');
+    document.getElementById('f-razon').value = tipoDetectado === 'venta' ? (extracted.razon_receptor || '') : (extracted.razon_emisor || '');
+    document.getElementById('f-neto').value = extracted.monto_neto || 0;
+    document.getElementById('f-iva').value = extracted.iva || Math.round((extracted.monto_neto||0)*0.19);
+    document.getElementById('f-total').value = extracted.total || 0;
+
+    // Check duplicate - bloqueante (folio + tipo para evitar falsos positivos)
+    const dupWarn = document.getElementById('dup-warning');
+    const tipoActual = extracted.es_boleta_honorarios ? 'bh' : (extracted.es_nota_credito ? 'nc' : tipoDetectado);
+    const dup = facturas.find(f => 
+      String(f.folio).trim() === String(extracted.numero_folio).trim() &&
+      f.tipo === tipoActual
+    );
+    if (dup) {
+      dupWarn.style.display = 'flex';
+      dupWarn.innerHTML = '<i class="fa-solid fa-ban" style="color:var(--red)"></i> <strong style="color:var(--red)">Este documento ya está cargado</strong> — Folio ' + extracted.numero_folio + ' (' + tipoActual.toUpperCase() + ') ya existe en el sistema. No se puede guardar de nuevo.';
+      document.getElementById('invoice-form').style.display = 'none';
+      document.getElementById('ai-status').style.display = 'none';
+      return;
+    }
+    dupWarn.style.display = 'none';
+
+    // Nota de crédito: mostrar aviso y guardar folio referenciado
+    const ncWarn = document.getElementById('nc-warning');
+    const ncFolioRef = document.getElementById('nc-folio-ref');
+    if (extracted.es_nota_credito && extracted.folio_referencia) {
+      ncFolioRef.textContent = extracted.folio_referencia;
+      ncWarn.style.display = 'flex';
+      // Guardar folio de referencia en dataset para usarlo al guardar
+      document.getElementById('invoice-form').dataset.ncFolioRef = extracted.folio_referencia;
+      // Marcar como NC en notas
+      document.getElementById('f-notas').value = `NC - anula factura folio ${extracted.folio_referencia}`;
+      // Cambiar texto del botón para que quede claro
+      document.querySelector('#invoice-form .btn-primary').innerHTML = '<i class="fa-solid fa-ban"></i> Anular factura folio ' + extracted.folio_referencia;
+    } else {
+      ncWarn.style.display = 'none';
+      delete document.getElementById('invoice-form').dataset.ncFolioRef;
+      document.querySelector('#invoice-form .btn-primary').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar factura';
+    }
+
+  } catch(e) {
+    document.getElementById('ai-status').style.display = 'none';
+    document.getElementById('ai-result-box').style.display = 'block';
+    document.getElementById('ai-chips').innerHTML = `<span style="color:var(--red)">Error al leer la factura: ${e.message}. Completá los datos manualmente.</span>`;
+    document.getElementById('invoice-form').style.display = 'block';
+  }
+}
+
+document.getElementById('f-neto')?.addEventListener('input', function() {
+  recalcIVA();
+});
+
+function onTipoChange() {
+  recalcIVA();
+  const tipo = document.getElementById('f-tipo').value;
+  const ivaRow = document.getElementById('f-iva').closest('.form-group');
+  const retencionRow = document.getElementById('f-retencion-row');
+  if (tipo === 'bh') {
+    if (ivaRow) ivaRow.style.opacity = '0.4';
+    if (retencionRow) retencionRow.style.display = 'block';
+  } else {
+    if (ivaRow) ivaRow.style.opacity = '1';
+    if (retencionRow) retencionRow.style.display = 'none';
+  }
+}
+
+function recalcIVA() {
+  const neto = parseFloat(document.getElementById('f-neto').value) || 0;
+  const tipo = document.getElementById('f-tipo').value;
+  if (tipo === 'bh') {
+    document.getElementById('f-iva').value = 0;
+    document.getElementById('f-total').value = neto;
+    const retencion = Math.round(neto * 0.13);
+    const retEl = document.getElementById('f-retencion-val');
+    if (retEl) retEl.textContent = '$' + retencion.toLocaleString('es-CL');
+  } else {
+    const iva = Math.round(neto * 0.19);
+    document.getElementById('f-iva').value = iva;
+    document.getElementById('f-total').value = neto + iva;
+  }
+}
+
+let guardandoFactura = false;
+async function guardarFactura() {
+  if (guardandoFactura) return;
+  guardandoFactura = true;
+
+  const btn = document.querySelector('#invoice-form .btn-primary');
+  const originalHTML = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '<span class="spinner"></span> Guardando...'; }
+
+  const reactivar = () => {
+    guardandoFactura = false;
+    if (btn) { btn.innerHTML = originalHTML; }
+  };
+
+  const id = 'F' + Date.now();
+  const f = {
+    id, fecha: document.getElementById('f-fecha').value,
+    folio: document.getElementById('f-folio').value,
+    rut: document.getElementById('f-rut').value,
+    razon: document.getElementById('f-razon').value,
+    tipo: document.getElementById('f-tipo').value,
+    neto: parseFloat(document.getElementById('f-neto').value)||0,
+    iva: parseFloat(document.getElementById('f-iva').value)||0,
+    total: parseFloat(document.getElementById('f-total').value)||0,
+    estado: document.getElementById('f-estado').value,
+    notas: document.getElementById('f-notas').value
+  };
+  if (!f.folio || !f.fecha || !f.total) {
+    document.getElementById('save-status').innerHTML = '<div class="alert alert-danger">Completá folio, fecha y total.</div>';
+    reactivar();
+    return;
+  }
+  document.getElementById('save-status').innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Guardando...</div>';
+  try {
+    const ncFolioRef = document.getElementById('invoice-form').dataset.ncFolioRef;
+
+    if (ncFolioRef) {
+      // Es NC: guardarla con estado "anulada" (no suma en totales) Y anular la factura referenciada
+      f.estado = 'anulada';
+      f.neto = -Math.abs(f.neto);
+      f.iva = -Math.abs(f.iva);
+      f.total = -Math.abs(f.total);
+      f.docTipo = 'NC';
+      await sheetsAppend('FACTURAS', [[f.id,f.fecha,f.folio,f.rut,f.razon,f.tipo,f.neto,f.iva,f.total,f.estado,f.notas]]);
+      facturas.push(f);
+
+      // Buscar la factura referenciada y anularla también
+      const facturaAnular = facturas.find(fa =>
+        String(fa.folio).trim() === String(ncFolioRef).trim() &&
+        !(fa.notas && fa.notas.startsWith('NC -'))
+      );
+
+      if (facturaAnular) {
+        facturaAnular.estado = 'anulada';
+        await sheetsUpdateById('FACTURAS', facturaAnular.id, 'J', 'anulada');
+        document.getElementById('save-status').innerHTML = '<div class="alert alert-success"><i class="fa-solid fa-check"></i> NC folio ' + f.folio + ' guardada y factura folio ' + ncFolioRef + ' marcada como <strong>anulada</strong>. Ninguna suma en los totales.</div>';
+        renderFacturas();
+        renderDashboard();
+      } else {
+        document.getElementById('save-status').innerHTML = '<div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation"></i> NC guardada, pero no se encontró la factura folio ' + ncFolioRef + '. Cambiala a "anulada" manualmente.</div>';
+      }
+    } else {
+      // Factura normal: guardar
+      await sheetsAppend('FACTURAS', [[f.id,f.fecha,f.folio,f.rut,f.razon,f.tipo,f.neto,f.iva,f.total,f.estado,f.notas]]);
+      facturas.push(f);
+      document.getElementById('save-status').innerHTML = '<div class="alert alert-success"><i class="fa-solid fa-check"></i> Factura guardada correctamente.</div>';
+    }
+
+    setTimeout(() => { guardandoFactura = false; resetSubirForm(); showPage('facturas'); }, 2000);
+  } catch(e) {
+    document.getElementById('save-status').innerHTML = `<div class="alert alert-danger">Error guardando: ${e.message}</div>`;
+    reactivar();
+  }
+}
+
+function resetSubirForm() {
+  document.getElementById('upload-label').textContent = 'Hacé clic o arrastrá un PDF/imagen acá';
+  document.getElementById('ai-result-box').style.display = 'none';
+  document.getElementById('ai-status').style.display = 'none';
+  document.getElementById('invoice-form').style.display = 'none';
+  document.getElementById('save-status').innerHTML = '';
+  document.getElementById('file-input').value = '';
+  document.getElementById('nc-warning').style.display = 'none';
+  delete document.getElementById('invoice-form').dataset.ncFolioRef;
+  document.querySelector('#invoice-form .btn-primary').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar factura';
+  ['f-folio','f-fecha','f-rut','f-razon','f-neto','f-iva','f-total','f-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+}
+
+// ==================== EXTRACTO ====================
+async function handleExtracto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('ext-ai-status').style.display = 'block';
+  try {
+    const base64 = await fileToBase64(file);
+    const prompt = `Sos un experto en extractos bancarios chilenos del banco Itaú. Extraé TODOS los movimientos del extracto.
+Para cada movimiento devolvé:
+- fecha: YYYY-MM-DD
+- descripcion: descripción del movimiento
+- tipo: "credito" o "debito"
+- monto: monto en CLP (solo número positivo)
+- rut: RUT del beneficiario/origen si aparece (opcional)
+
+Respondé SOLO con JSON array. Ejemplo: [{"fecha":"2026-01-15","descripcion":"Transferencia recibida EMPRESA SA","tipo":"credito","monto":1190000,"rut":"12.345.678-9"}]`;
+
+    const body = { model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+      { type: 'text', text: prompt }
+    ]}]};
+
+    const resp = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await resp.json();
+    const text = data.content[0].text.replace(/```json|```/g,'').trim();
+    const movimientos = JSON.parse(text);
+
+    document.getElementById('ext-ai-status').style.display = 'none';
+
+    // Match con facturas
+    const nuevos = movimientos.map(m => {
+      const id = 'E' + Date.now() + Math.random().toString(36).substr(2,5);
+      let matchFolio = '';
+      let estado = 'sin_match';
+      const rutNorm = normalizeRut(m.rut||'');
+      const match = facturas.find(f => {
+        if (f.estado !== 'pendiente') return false;
+        if (rutNorm && normalizeRut(f.rut) === rutNorm) return true;
+        const desc = (m.descripcion||'').toLowerCase();
+        return desc.includes(f.razon?.toLowerCase()) || desc.includes(f.folio);
+      });
+      if (match) { matchFolio = match.folio; estado = 'match'; }
+      return { id, fecha: m.fecha, descripcion: m.descripcion, tipo: m.tipo, monto: m.monto, matchFolio, estado, notas: '' };
+    });
+
+    extracto.push(...nuevos);
+    await sheetsAppend('EXTRACTO', nuevos.map(e => [e.id,e.fecha,e.descripcion,e.tipo,e.monto,e.matchFolio,e.estado,e.notas]));
+    renderExtracto();
+  } catch(e) {
+    document.getElementById('ext-ai-status').style.display = 'none';
+    alert('Error procesando extracto: ' + e.message);
+  }
+}
+
+// ==================== TRANSFERENCIAS ====================
+let transferencias = [];
+
+function renderTransferencias() {
+  const tbody = document.getElementById('trf-tbody');
+  if (!tbody) return;
+  const filtered = transferencias.filter(t => matchesFilter(t.fecha, 'trf-year', 'trf-month'));
+  tbody.innerHTML = filtered.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;color:var(--text2);padding:32px">No hay transferencias cargadas</td></tr>'
+    : filtered.map(t => `
+    <tr>
+      <td>${String(t.fecha).substring(0,10)}</td>
+      <td>${t.proveedor||'—'}</td>
+      <td><strong>${t.folioFactura||'—'}</strong></td>
+      <td><strong>${fmt(t.monto)}</strong></td>
+      <td style="color:var(--text2);font-size:12px">${t.numero||'—'}</td>
+      <td>${t.comprobante ? '<span style="color:var(--green)"><i class="fa-solid fa-paperclip"></i> Adjunto</span>' : '<span style="color:var(--text2)">Sin archivo</span>'}</td>
+      <td><span class="badge badge-pagada">pagada</span></td>
+      <td class="actions-cell">
+        <button class="icon-btn del" onclick="deleteTransferencia('${t.id}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+function openTransferenciaModal() {
+  // Llenar select de facturas de compra pendientes
+  const sel = document.getElementById('trf-folio-select');
+  const pendientes = facturas.filter(f => (f.tipo === 'compra' || f.tipo === 'bh') && (f.estado === 'pendiente' || f.estado === 'parcial'));
+  sel.innerHTML = '<option value="">— Seleccionar factura —</option>' +
+    pendientes.map(f => `<option value="${f.folio}" data-id="${f.id}" data-monto="${f.total}">${f.razon||'Sin nombre'} — Folio ${f.folio} — ${fmt(f.total)}</option>`).join('');
+  sel.onchange = function() {
+    const opt = this.options[this.selectedIndex];
+    if (opt.dataset.monto) document.getElementById('trf-monto').value = Math.abs(opt.dataset.monto);
+  };
+  document.getElementById('trf-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('trf-save-status').innerHTML = '';
+  document.getElementById('trf-modal').style.display = 'flex';
+}
+
+function closeTrfModal() {
+  document.getElementById('trf-modal').style.display = 'none';
+}
+
+async function guardarTransferencia() {
+  const folio = document.getElementById('trf-folio-select').value;
+  const fecha = document.getElementById('trf-fecha').value;
+  const monto = parseFloat(document.getElementById('trf-monto').value) || 0;
+  const numero = document.getElementById('trf-numero').value;
+  const notas = document.getElementById('trf-notas').value;
+  const medio = document.getElementById('trf-medio')?.value || 'transferencia';
+
+  if (!folio || !fecha || !monto) {
+    document.getElementById('trf-save-status').innerHTML = '<div class="alert alert-warning">Completá fecha, factura y monto.</div>';
+    return;
+  }
+
+  const sel = document.getElementById('trf-folio-select');
+  const opt = sel.options[sel.selectedIndex];
+  const facturaId = opt.dataset.id;
+  const facturaTotal = parseFloat(opt.dataset.monto) || 0;
+  const proveedor = opt.text.split(' — ')[0];
+
+  const t = { id: 'T' + Date.now(), fecha, folioFactura: folio, proveedor, monto, numero, notas: notas || medio, comprobante: '' };
+
+  document.getElementById('trf-save-status').innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Guardando...</div>';
+  try {
+    await sheetsAppend('TRANSFERENCIAS', [[t.id, t.fecha, t.folioFactura, t.proveedor, t.monto, t.numero, t.notas]]);
+    transferencias.push(t);
+
+    // Determinar estado según monto pagado vs total factura
+    const fa = facturas.find(f => f.id === facturaId);
+    const totalPagadoAntes = transferencias.filter(x => x.folioFactura === folio && x.id !== t.id).reduce((s,x) => s+x.monto, 0);
+    const totalPagado = totalPagadoAntes + monto;
+    const nuevoEstado = totalPagado >= Math.abs(facturaTotal) ? 'pagada' : 'parcial';
+    
+    await sheetsUpdateById('FACTURAS', facturaId, 'J', nuevoEstado);
+    if (fa) fa.estado = nuevoEstado;
+
+    const msg = nuevoEstado === 'parcial' 
+      ? `Pago parcial registrado (${fmt(monto)} de ${fmt(Math.abs(facturaTotal))}). Saldo: ${fmt(Math.abs(facturaTotal) - totalPagado)}`
+      : 'Transferencia guardada y factura marcada como pagada.';
+    
+    document.getElementById('trf-save-status').innerHTML = `<div class="alert alert-success"><i class="fa-solid fa-check"></i> ${msg}</div>`;
+    
+    // Descargar PDF
+    try { downloadOrdenPagoTransferencia(t, opt.text); } catch(pdfErr) { console.warn('PDF error:', pdfErr); }
+    
+    setTimeout(() => { closeTrfModal(); renderTransferencias(); renderFacturas(); renderDashboard(); }, 1800);
+  } catch(e) {
+    document.getElementById('trf-save-status').innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+  }
+}
+
+async function deleteTransferencia(id) {
+  if (!confirm('¿Eliminar esta transferencia?')) return;
+  await sheetsDelete('TRANSFERENCIAS', id);
+  transferencias = transferencias.filter(t => t.id !== id);
+  renderTransferencias();
+}
+
+function downloadOrdenPagoTransferencia(t, facturaDesc) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const now = new Date().toLocaleDateString('es-CL');
+  doc.setFontSize(16); doc.setTextColor(91,106,240);
+  doc.text('COMPROBANTE DE PAGO', 14, 18);
+  doc.setDrawColor(91,106,240); doc.setLineWidth(0.5); doc.line(14, 21, 196, 21);
+  doc.setTextColor(0,0,0); doc.setFontSize(10);
+  let y = 30;
+  [['Fecha', String(t.fecha).substring(0,10)],['Proveedor', t.proveedor||''],['Factura','Folio '+t.folioFactura],['N Transferencia', t.numero||'—'],['Notas', t.notas||'—']].forEach(([k,v]) => {
+    doc.setFont(undefined,'bold'); doc.text(k+': ',14,y); doc.setFont(undefined,'normal'); doc.text(String(v),60,y); y+=8;
+  });
+  y += 4;
+  doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.setTextColor(22,163,74);
+  doc.text('MONTO PAGADO: $'+(t.monto||0).toLocaleString('es-CL'), 14, y);
+  doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(156,163,175);
+  doc.text('Generado por WTF Chile CC - '+now, 14, 285);
+  doc.save('Pago_Folio'+t.folioFactura+'_'+now.replace(/\//g,'-')+'.pdf');
+}
+
+// ==================== GASTOS OPERATIVOS ====================
+let gastos = [];
+
+function renderGastos() {
+  const tbody = document.getElementById('gto-tbody');
+  if (!tbody) return;
+  const cat = document.getElementById('gto-cat')?.value;
+  const filtered = gastos.filter(g => {
+    if (!matchesFilter(g.fecha, 'gto-year', 'gto-month')) return false;
+    if (cat && g.categoria !== cat) return false;
+    return true;
+  });
+  const total = filtered.reduce((s, g) => s + g.monto, 0);
+  const totalBar = document.getElementById('gto-total-bar');
+  const totalEl = document.getElementById('gto-total');
+  if (totalBar) totalBar.style.display = filtered.length ? 'block' : 'none';
+  if (totalEl) totalEl.textContent = fmt(total);
+
+  tbody.innerHTML = filtered.length === 0
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:32px">No hay gastos cargados</td></tr>'
+    : filtered.map(g => `
+    <tr>
+      <td>${String(g.fecha).substring(0,10)}</td>
+      <td>${g.descripcion||'—'}</td>
+      <td><span class="badge" style="background:rgba(99,102,241,0.15);color:#818cf8">${g.categoria||'—'}</span></td>
+      <td><strong style="color:var(--red)">${fmt(g.monto)}</strong></td>
+      <td style="color:var(--text2)">${g.quien||'—'}</td>
+      <td style="color:var(--text2);font-size:12px">${g.notas||'—'}</td>
+      <td class="actions-cell">
+        <button class="icon-btn del" onclick="deleteGasto('${g.id}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+}
+
+function openGastoModal() {
+  document.getElementById('gto-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('gto-desc').value = '';
+  document.getElementById('gto-monto').value = '';
+  document.getElementById('gto-notas').value = '';
+  document.getElementById('gto-save-status').innerHTML = '';
+  document.getElementById('gto-modal').style.display = 'flex';
+}
+
+function closeGtoModal() {
+  document.getElementById('gto-modal').style.display = 'none';
+}
+
+async function guardarGasto() {
+  const fecha = document.getElementById('gto-fecha').value;
+  const desc = document.getElementById('gto-desc').value;
+  const monto = parseFloat(document.getElementById('gto-monto').value) || 0;
+  const cat = document.getElementById('gto-categoria').value;
+  const quien = document.getElementById('gto-quien').value;
+  const notas = document.getElementById('gto-notas').value;
+
+  if (!fecha || !desc || !monto) {
+    document.getElementById('gto-save-status').innerHTML = '<div class="alert alert-warning">Completá fecha, descripción y monto.</div>';
+    return;
+  }
+
+  const g = { id: 'G' + Date.now(), fecha, descripcion: desc, categoria: cat, monto, quien, notas };
+  document.getElementById('gto-save-status').innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Guardando...</div>';
+  try {
+    await sheetsAppend('GASTOS', [[g.id, g.fecha, g.descripcion, g.categoria, g.monto, g.quien, g.notas]]);
+    gastos.push(g);
+    document.getElementById('gto-save-status').innerHTML = '<div class="alert alert-success"><i class="fa-solid fa-check"></i> Gasto guardado.</div>';
+    setTimeout(() => { closeGtoModal(); renderGastos(); }, 1200);
+  } catch(e) {
+    document.getElementById('gto-save-status').innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+  }
+}
+
+async function deleteGasto(id) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  await sheetsDelete('GASTOS', id);
+  gastos = gastos.filter(g => g.id !== id);
+  renderGastos();
+}
+
+function renderExtracto() {
+  const filtered = extracto.filter(e => matchesFilter(e.fecha, 'ext-year', 'ext-month'));
+  const tbody = document.getElementById('ext-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-building-columns"></i><br>No hay movimientos cargados.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(e => `
+    <tr data-id="${e.id}" class="${e._selected?'selected':''}">
+      <td class="checkbox-cell"><input type="checkbox" onchange="toggleSelect('extracto','${e.id}',this)" ${e._selected?'checked':''}></td>
+      <td>${e.fecha}</td>
+      <td>${e.descripcion}</td>
+      <td><span class="badge badge-${e.tipo==='credito'?'venta':'compra'}">${e.tipo}</span></td>
+      <td><strong>${fmt(e.monto)}</strong></td>
+      <td>${e.matchFolio ? `<span class="badge badge-conciliada">Folio ${e.matchFolio}</span>` : '—'}</td>
+      <td><span class="badge badge-${e.estado==='match'?'pagada':'pendiente'}">${e.estado}</span></td>
+      <td class="actions-cell">
+        <button class="icon-btn del" onclick="deleteExtracto('${e.id}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deleteExtracto(id) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  extracto = extracto.filter(e => e.id !== id);
+  await rebuildSheet('EXTRACTO', extractoToRows());
+  renderExtracto();
+}
+
+function extractoToRows() { return extracto.map(e => [e.id,e.fecha,e.descripcion,e.tipo,e.monto,e.matchFolio,e.estado,e.notas]); }
+
+// ==================== FACTORING ====================
+async function handleFactoring(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('fac-ai-status').style.display = 'block';
+  document.getElementById('fac-result').style.display = 'none';
+  try {
+    const base64 = await fileToBase64(file);
+    const isPdf = file.type === 'application/pdf';
+    const foliosDisponibles = facturas.filter(f => f.tipo==='venta' && f.estado==='pendiente').map(f => `Folio ${f.folio}: ${fmt(f.total)} (${f.razon})`).join('\n') || 'Sin facturas pendientes';
+    const prompt = `Sos un experto en factoring chileno. Analizá esta simulación de GoCapital y extraé:
+- numero_orden: número de orden o referencia
+- fecha: fecha de la operación (YYYY-MM-DD)
+- folios_incluidos: array con los números de folio incluidos en el factoring
+- monto_bruto: monto total de las facturas en CLP
+- costo_factoring: comisión o costo del factoring en CLP
+- excedente: excedente si lo hay en CLP (puede ser 0)
+- liquido_a_recibir: monto líquido que recibirá la empresa en CLP
+- tasa: tasa de descuento si aparece (porcentaje)
+
+Facturas de venta pendientes disponibles para match:\n${foliosDisponibles}
+
+Respondé SOLO con JSON. Ejemplo: {"numero_orden":"OP-2026-001","fecha":"2026-06-01","folios_incluidos":["1234","1235"],"monto_bruto":5000000,"costo_factoring":150000,"excedente":50000,"liquido_a_recibir":4850000,"tasa":"3%"}`;
+
+    const body = { model: 'claude-sonnet-4-6', max_tokens: 800, messages: [{ role: 'user', content: [
+      isPdf ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+             : { type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } },
+      { type: 'text', text: prompt }
+    ]}]};
+
+    const resp = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await resp.json();
+    if (!data.content || !data.content[0]) {
+      throw new Error('API error: ' + JSON.stringify(data).substring(0, 300));
+    }
+    const text = data.content[0].text.replace(/```json|```/g,'').trim();
+    const extracted = JSON.parse(text);
+
+    document.getElementById('fac-ai-status').style.display = 'none';
+    document.getElementById('fac-result').style.display = 'block';
+
+    // Match facturas
+    // Deduplicar folios (la IA a veces repite el mismo folio)
+    if (extracted.folios_incluidos) {
+      extracted.folios_incluidos = [...new Set(extracted.folios_incluidos.map(f => String(f).trim()))];
+    }
+    const matchedInvoices = facturas.filter(f => extracted.folios_incluidos?.includes(String(f.folio)));
+
+    pendingOrdenPago = { ...extracted, matchedInvoices };
+
+    // Mostrar resultado y preview
+    const matchHtml = matchedInvoices.length ?
+      matchedInvoices.map(f => `<div class="match-row"><span>Folio ${f.folio} — ${f.razon}</span><span style="color:var(--green)">${fmt(f.total)}</span></div>`).join('') :
+      '<div style="color:var(--yellow)">⚠️ No se encontraron facturas coincidentes — revisá los folios.</div>';
+
+    document.getElementById('fac-result').innerHTML = `
+      <div class="factoring-match">
+        <h4><i class="fa-solid fa-check-circle"></i> Factoring procesado — revisá antes de guardar</h4>
+        ${matchHtml}
+        <div class="match-row" style="margin-top:8px"><span>Monto bruto</span><span>${fmt(extracted.monto_bruto)}</span></div>
+        <div class="match-row"><span>Costo factoring</span><span style="color:var(--red)">-${fmt(extracted.costo_factoring)}</span></div>
+        <div class="match-row"><span>Excedente</span><span>${fmt(extracted.excedente||0)}</span></div>
+        <div class="match-row"><span><strong>Líquido a recibir</strong></span><span style="color:var(--green)"><strong>${fmt(extracted.liquido_a_recibir)}</strong></span></div>
+        ${extracted.tasa ? `<div class="match-row"><span>Tasa</span><span>${extracted.tasa}</span></div>` : ''}
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-primary" onclick="openOrdenPago()"><i class="fa-solid fa-file-pdf"></i> Ver orden de pago</button>
+        <button class="btn btn-success" onclick="confirmarFactoring()"><i class="fa-solid fa-check"></i> Confirmar y guardar</button>
+      </div>
+    `;
+  } catch(e) {
+    document.getElementById('fac-ai-status').style.display = 'none';
+    document.getElementById('fac-result').style.display = 'block';
+    document.getElementById('fac-result').innerHTML = `<div class="alert alert-danger">Error al procesar: ${e.message}</div>`;
+  }
+}
+
+function openOrdenPago() {
+  if (!pendingOrdenPago) return;
+  const op = pendingOrdenPago;
+  const now = new Date().toLocaleDateString('es-CL');
+  document.getElementById('orden-pago-content').innerHTML = `
+    <div class="orden-pago-preview">
+      <h3>ORDEN DE PAGO — FACTORING GOCAPITAL</h3>
+      <div class="op-row"><span>N° Orden</span><span>${op.numero_orden||'—'}</span></div>
+      <div class="op-row"><span>Fecha operación</span><span>${op.fecha||now}</span></div>
+      <div class="op-row"><span>Empresa</span><span>WTF Advertising SPA</span></div>
+      <div class="op-row"><span>RUT</span><span>76.962.937-8</span></div>
+      <hr style="margin:12px 0;border-color:#e5e7eb">
+      <strong style="font-size:12px;color:#6b7280">FACTURAS INCLUIDAS</strong>
+      ${op.matchedInvoices?.length ? op.matchedInvoices.map(f => `
+        <div class="op-row"><span>Folio ${f.folio} — ${f.razon}</span><span>$${f.total.toLocaleString('es-CL')}</span></div>
+      `).join('') : '<div class="op-row"><span>Sin match de facturas</span><span>—</span></div>'}
+      <hr style="margin:12px 0;border-color:#e5e7eb">
+      <div class="op-row"><span>Monto bruto</span><span>$${(op.monto_bruto||0).toLocaleString('es-CL')}</span></div>
+      <div class="op-row"><span>Costo factoring</span><span>-$${(op.costo_factoring||0).toLocaleString('es-CL')}</span></div>
+      <div class="op-row"><span>Excedente</span><span>$${(op.excedente||0).toLocaleString('es-CL')}</span></div>
+      <div class="op-row"><span><strong>LÍQUIDO A RECIBIR</strong></span><span><strong>$${(op.liquido_a_recibir||0).toLocaleString('es-CL')}</strong></span></div>
+      ${op.tasa ? `<div class="op-row"><span>Tasa aplicada</span><span>${op.tasa}</span></div>` : ''}
+      <hr style="margin:12px 0;border-color:#e5e7eb">
+      <div style="font-size:11px;color:#9ca3af;text-align:center">Generado por WTF Chile CC — ${now}</div>
+    </div>
+  `;
+  openModal('modal-orden-pago');
+}
+
+async function confirmarOrdenPago() {
+  closeModal('modal-orden-pago');
+  await confirmarFactoring();
+}
+
+async function confirmarFactoring() {
+  if (!pendingOrdenPago) return;
+  // Evitar doble click
+  const btns = document.querySelectorAll('#fac-result .btn-success');
+  btns.forEach(b => { b.disabled = true; b.innerHTML = '<span class="spinner"></span> Guardando...'; });
+
+  const op = pendingOrdenPago;
+  pendingOrdenPago = null; // limpiar ANTES de guardar para evitar doble ejecución
+
+  const id = 'OP' + Date.now();
+  const orden = {
+    id, fecha: op.fecha || new Date().toISOString().split('T')[0],
+    nOrden: op.numero_orden||id,
+    folios: (op.folios_incluidos||[]).join(', '),
+    montoBruto: op.monto_bruto||0,
+    costoFactoring: op.costo_factoring||0,
+    excedente: op.excedente||0,
+    liquido: op.liquido_a_recibir||0,
+    notas: ''
+  };
+  factoringOrdenes.push(orden);
+  await sheetsAppend('FACTORING', [[orden.id,orden.fecha,orden.nOrden,orden.folios,orden.montoBruto,orden.costoFactoring,orden.excedente,orden.liquido,orden.notas]]);
+
+  // Marcar facturas como "en factoring"
+  for (const f of (op.matchedInvoices||[])) {
+    const fa = facturas.find(x => x.id === f.id);
+    if (fa) {
+      fa.estado = 'factoring';
+      await sheetsUpdateById('FACTURAS', fa.id, 'J', 'factoring');
+    }
+  }
+
+  // Descargar PDF automáticamente
+  downloadOrdenPagoFactoring(op, orden);
+
+  document.getElementById('fac-result').innerHTML = '<div class="alert alert-success"><i class="fa-solid fa-check"></i> Orden de pago guardada. Descargando PDF...</div>';
+  setTimeout(() => { document.getElementById('fac-result').style.display = 'none'; }, 2000);
+  renderFactoring();
+  renderDashboard();
+}
+
+function downloadOrdenPagoFactoring(op, orden) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const now = new Date().toLocaleDateString('es-CL');
+  doc.setFontSize(16); doc.setTextColor(91,106,240);
+  doc.text('ORDEN DE PAGO - FACTORING GOCAPITAL', 14, 18);
+  doc.setDrawColor(91,106,240); doc.setLineWidth(0.5); doc.line(14, 21, 196, 21);
+  doc.setTextColor(0,0,0); doc.setFontSize(10);
+  let y = 28;
+  [['N Orden', String(orden.nOrden)],['Fecha', String(op.fecha||now)],['Empresa','WTF Advertising SPA'],['RUT','76.962.937-8']].forEach(([k,v]) => {
+    doc.setFont(undefined,'bold'); doc.text(k+': ',14,y); doc.setFont(undefined,'normal'); doc.text(v,50,y); y+=7;
+  });
+  y+=4;
+  const rows = (op.matchedInvoices||[]).map(f => ['Folio '+f.folio, f.razon||'', '$'+(f.total||0).toLocaleString('es-CL')]);
+  doc.autoTable({ startY: y, head:[['Folio','Cliente','Monto']], body: rows.length ? rows : [['Sin facturas','','']], headStyles:{fillColor:[91,106,240]}, styles:{fontSize:9} });
+  y = doc.lastAutoTable.finalY + 8;
+  [['Monto bruto','$'+(op.monto_bruto||0).toLocaleString('es-CL')],['Costo factoring','-$'+(op.costo_factoring||0).toLocaleString('es-CL')],['Excedente','$'+(op.excedente||0).toLocaleString('es-CL')]].forEach(([k,v]) => {
+    doc.text(k+': ',14,y); doc.text(v,80,y); y+=7;
+  });
+  if (op.tasa) { doc.text('Tasa: ',14,y); doc.text(String(op.tasa),80,y); y+=7; }
+  doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(22,163,74);
+  doc.text('LIQUIDO A RECIBIR: $'+(op.liquido_a_recibir||0).toLocaleString('es-CL'), 14, y+4);
+  doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.setTextColor(156,163,175);
+  doc.text('Generado por WTF Chile CC - '+now, 14, 285);
+  doc.save('OrdenPago_'+String(orden.nOrden)+'_'+now.replace(/\//g,'-')+'.pdf');
+}
+function renderFactoring() {
+  const filtered = factoringOrdenes.filter(o => matchesFilter(o.fecha, 'fac-year', 'fac-month'));
+  const tbody = document.getElementById('fac-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-hand-holding-dollar"></i><br>Sin órdenes de factoring.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(o => `
+    <tr data-id="${o.id}" class="${o._selected?'selected':''}">
+      <td class="checkbox-cell"><input type="checkbox" onchange="toggleSelect('factoring','${o.id}',this)" ${o._selected?'checked':''}></td>
+      <td>${o.fecha}</td>
+      <td><strong>${o.nOrden}</strong></td>
+      <td style="font-size:12px">${o.folios}</td>
+      <td>${fmt(o.montoBruto)}</td>
+      <td style="color:var(--red)">-${fmt(o.costoFactoring)}</td>
+      <td style="color:var(--yellow)">${fmt(o.excedente)}</td>
+      <td style="color:var(--green)"><strong>${fmt(o.liquido)}</strong></td>
+      <td class="actions-cell">
+        <button class="icon-btn del" onclick="deleteOrden('${o.id}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deleteOrden(id) {
+  if (!confirm('¿Eliminar esta orden de factoring?')) return;
+  await sheetsDelete('FACTORING', id);
+  factoringOrdenes = factoringOrdenes.filter(o => o.id !== id);
+  renderFactoring();
+}
+
+function factoringToRows() { return factoringOrdenes.map(o => [o.id,o.fecha,o.nOrden,o.folios,o.montoBruto,o.costoFactoring,o.excedente,o.liquido,o.notas]); }
+
+// ==================== MAESTRO ====================
+// ==================== CUENTA CORRIENTE PROVEEDORES ====================
+function renderCuentaCorriente() {
+  // Poblar select de proveedores
+  const sel = document.getElementById('cc-proveedor');
+  if (sel) {
+    const proveedores = [...new Set(
+      facturas.filter(f => f.tipo === 'compra' || f.tipo === 'bh').map(f => f.razon).filter(Boolean)
+    )].sort();
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Todos los proveedores</option>' +
+      proveedores.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('');
+  }
+
+  const buscar = (document.getElementById('cc-buscar')?.value||'').toLowerCase().trim();
+  const compras = facturas.filter(f =>
+    (f.tipo === 'compra' || f.tipo === 'bh') &&
+    f.estado !== 'anulada' &&
+    (!buscar || (f.razon||'').toLowerCase().includes(buscar))
+  );
+
+  // Agrupar por proveedor
+  const grupos = {};
+  for (const f of compras) {
+    const key = f.razon || 'Sin nombre';
+    if (!grupos[key]) grupos[key] = { facturas: [], pagos: [] };
+    grupos[key].facturas.push(f);
+  }
+  for (const t of transferencias) {
+    const key = t.proveedor;
+    if (grupos[key]) grupos[key].pagos.push(t);
+  }
+
+  const content = document.getElementById('cc-content');
+  if (!content) return;
+
+  if (Object.keys(grupos).length === 0) {
+    content.innerHTML = '<div style="text-align:center;color:var(--text2);padding:32px">No hay compras cargadas.</div>';
+    return;
+  }
+
+  content.innerHTML = Object.entries(grupos).map(([proveedor, data]) => {
+    const totalFacturado = data.facturas.reduce((s, f) => s + f.total, 0);
+    const totalPagado = data.pagos.reduce((s, t) => s + t.monto, 0);
+    const saldo = totalFacturado - totalPagado;
+    const color = saldo <= 0 ? 'var(--green)' : 'var(--red)';
+
+    const filasFacturas = data.facturas.map(f => `
+      <tr>
+        <td>${String(f.fecha).substring(0,10)}</td>
+        <td>Folio ${f.folio}</td>
+        <td><span class="badge badge-${f.tipo}">${f.tipo.toUpperCase()}</span></td>
+        <td style="text-align:right">${fmt(f.total)}</td>
+        <td><span class="badge badge-${f.estado}">${f.estado}</span></td>
+      </tr>`).join('');
+
+    const filasPagos = data.pagos.map(t => `
+      <tr style="background:rgba(34,197,94,0.05)">
+        <td>${String(t.fecha).substring(0,10)}</td>
+        <td>Transf. N° ${t.numero||'—'}</td>
+        <td><span style="background:rgba(34,197,94,0.15);color:var(--green);padding:2px 7px;border-radius:4px;font-size:11px">PAGO</span></td>
+        <td style="text-align:right;color:var(--green)">-${fmt(t.monto)}</td>
+        <td>—</td>
+      </tr>`).join('');
+
+    return `
+      <div style="background:var(--surface2);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0;font-size:15px">${proveedor}</h3>
+          <div style="text-align:right">
+            <div style="font-size:12px;color:var(--text2)">Saldo pendiente</div>
+            <div style="font-size:20px;font-weight:800;color:${color}">${fmt(saldo)}</div>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="color:var(--text2);font-size:11px;text-transform:uppercase">
+            <th style="text-align:left;padding:6px 8px">Fecha</th>
+            <th style="text-align:left;padding:6px 8px">Documento</th>
+            <th style="text-align:left;padding:6px 8px">Tipo</th>
+            <th style="text-align:right;padding:6px 8px">Monto</th>
+            <th style="text-align:left;padding:6px 8px">Estado</th>
+          </tr></thead>
+          <tbody>${filasFacturas}${filasPagos}</tbody>
+          <tfoot><tr>
+            <td colspan="3" style="padding:8px;font-weight:700">Total facturado</td>
+            <td style="text-align:right;padding:8px;font-weight:700">${fmt(totalFacturado)}</td>
+            <td></td>
+          </tr><tr>
+            <td colspan="3" style="padding:4px 8px;color:var(--green)">Total pagado</td>
+            <td style="text-align:right;padding:4px 8px;color:var(--green)">-${fmt(totalPagado)}</td>
+            <td></td>
+          </tr><tr>
+            <td colspan="3" style="padding:8px;font-weight:800;font-size:15px">SALDO</td>
+            <td style="text-align:right;padding:8px;font-weight:800;font-size:15px;color:${color}">${fmt(saldo)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>
+      </div>`;
+  }).join('');
+}
+
+function renderMaestro() {
+  const tbody = document.getElementById('maestro-tbody');
+  tbody.innerHTML = maestro.length ? maestro.map(m => `
+    <tr>
+      <td>${m.rut}</td><td><strong>${m.razon}</strong></td>
+      <td><span class="badge badge-${m.tipo==='cliente'?'venta':'compra'}">${m.tipo}</span></td>
+      <td style="color:var(--text2);font-size:12px">${m.notas||'—'}</td>
+      <td class="actions-cell">
+        <button class="icon-btn del" onclick="deleteMaestro('${m.id}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="5"><div class="empty-state">Sin empresas cargadas</div></td></tr>';
+}
+
+function openMaestroModal() {
+  document.getElementById('m-id').value = '';
+  ['m-rut','m-razon','m-notas'].forEach(id => document.getElementById(id).value = '');
+  openModal('modal-maestro');
+}
+
+async function saveMaestro() {
+  const id = 'M' + Date.now();
+  const m = { id, rut: document.getElementById('m-rut').value, razon: document.getElementById('m-razon').value, tipo: document.getElementById('m-tipo').value, notas: document.getElementById('m-notas').value };
+  if (!m.rut || !m.razon) { alert('Completá RUT y razón social.'); return; }
+  await sheetsAppend('MAESTRO', [[m.id, m.rut, m.razon, m.tipo, m.notas]]);
+  maestro.push(m);
+  closeModal('modal-maestro');
+  renderMaestro();
+}
+
+async function deleteMaestro(id) {
+  if (!confirm('¿Eliminar empresa del maestro?')) return;
+  maestro = maestro.filter(m => m.id !== id);
+  await rebuildSheet('MAESTRO', maestro.map(m => [m.id,m.rut,m.razon,m.tipo,m.notas]));
+  renderMaestro();
+}
+
+// ==================== UTILS ====================
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  return '$' + Math.round(n).toLocaleString('es-CL');
+}
+
+function normalizeRut(rut) {
+  return String(rut).replace(/\./g,'').replace(/-/g,'').toLowerCase().trim();
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function downloadOrdenPago() {
+  const content = document.getElementById('orden-pago-content').innerHTML;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orden de Pago</title>
+  <style>body{font-family:Arial,sans-serif;padding:30px;max-width:600px;margin:0 auto}h3{color:#5b6af0;border-bottom:2px solid #5b6af0;padding-bottom:8px}.op-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #e5e7eb}@media print{body{padding:20px}}</style></head>
+  <body>${content}<script>window.onload=()=>{window.print();}<\/script></body></html>`);
+  win.document.close();
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+</script>
+</body>
+</html>
