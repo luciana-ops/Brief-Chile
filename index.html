@@ -1030,12 +1030,11 @@ let dashChart = null;
 function renderDashboard() {
   const filtered = facturas.filter(f => matchesFilter(f.fecha, 'dash-year', 'dash-month'));
   const ventas = filtered.filter(f => f.tipo === 'venta' && f.estado !== 'anulada');
-  const compras = filtered.filter(f => (f.tipo === 'compra') && f.estado !== 'anulada');
-  const bhs = filtered.filter(f => f.tipo === 'bh' && f.estado !== 'anulada');
+  const compras = filtered.filter(f => (f.tipo === 'compra' || f.tipo === 'bh') && f.estado !== 'anulada');
   const netoVentas = ventas.reduce((a,f) => a+f.neto, 0);
   const netoCompras = compras.reduce((a,f) => a+f.neto, 0);
-  const pendientesVenta = ventas.filter(f => f.estado === 'pendiente').reduce((a,f) => a+f.neto, 0);
-  const pendientesCompra = compras.filter(f => f.estado === 'pendiente').reduce((a,f) => a+f.neto, 0);
+  const pendientesVenta = ventas.filter(f => f.estado === 'pendiente' || f.estado === 'parcial').reduce((a,f) => a+f.neto, 0);
+  const pendientesCompra = compras.filter(f => f.estado === 'pendiente' || f.estado === 'parcial').reduce((a,f) => a+f.neto, 0);
   const tc = parseFloat(document.getElementById('dash-tc')?.value) || 890;
   const fmtUSD = n => 'USD ' + Math.round(Math.abs(n)/tc).toLocaleString('es-CL');
 
