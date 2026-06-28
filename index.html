@@ -1462,9 +1462,12 @@ Ejemplo NC: {"numero_folio":"45","fecha":"2026-03-10","rut_emisor":"76.962.937-8
     // Check duplicate - bloqueante (folio + tipo para evitar falsos positivos)
     const dupWarn = document.getElementById('dup-warning');
     const tipoActual = extracted.es_boleta_honorarios ? 'bh' : (extracted.es_nota_credito ? 'nc' : tipoDetectado);
-    const dup = facturas.find(f => 
+    // El RUT relevante para el chequeo: para ventas es el receptor, para compras/BH es el emisor
+    const rutParaDup = normalizeRut(tipoDetectado === 'venta' ? (extracted.rut_receptor||'') : (extracted.rut_emisor||''));
+    const dup = facturas.find(f =>
       String(f.folio).trim() === String(extracted.numero_folio).trim() &&
-      f.tipo === tipoActual
+      f.tipo === tipoActual &&
+      normalizeRut(f.rut) === rutParaDup
     );
     if (dup) {
       dupWarn.style.display = 'flex';
