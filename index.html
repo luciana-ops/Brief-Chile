@@ -649,6 +649,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent);
           </div>
           <div class="form-group">
             <label>Factura / BH a pagar</label>
+            <input type="text" id="trf-proveedor-search" placeholder="Buscar proveedor..." oninput="filtrarTrfSelect()" style="margin-bottom:6px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;width:100%">
             <select id="trf-folio-select"></select>
           </div>
           <div class="form-group">
@@ -1893,12 +1894,22 @@ function updateTrfPlaceholders() {
   montoLabel.textContent = p.monto;
 }
 
+let _trfPendientes = [];
+
+function filtrarTrfSelect() {
+  const q = document.getElementById('trf-proveedor-search').value.toLowerCase().trim();
+  const sel = document.getElementById('trf-folio-select');
+  const filtrados = q ? _trfPendientes.filter(f => (f.razon||'').toLowerCase().includes(q)) : _trfPendientes;
+  sel.innerHTML = '<option value="">— Seleccionar factura —</option>' +
+    filtrados.map(f => `<option value="${f.folio}" data-id="${f.id}" data-monto="${f.total}">${f.razon||'Sin nombre'} — Folio ${f.folio} — ${fmt(f.total)}</option>`).join('');
+}
+
 function openTransferenciaModal() {
   // Llenar select de facturas de compra pendientes
   const sel = document.getElementById('trf-folio-select');
-  const pendientes = facturas.filter(f => (f.tipo === 'compra' || f.tipo === 'bh') && (f.estado === 'pendiente' || f.estado === 'parcial'));
+  _trfPendientes = facturas.filter(f => (f.tipo === 'compra' || f.tipo === 'bh') && (f.estado === 'pendiente' || f.estado === 'parcial'));
   sel.innerHTML = '<option value="">— Seleccionar factura —</option>' +
-    pendientes.map(f => `<option value="${f.folio}" data-id="${f.id}" data-monto="${f.total}">${f.razon||'Sin nombre'} — Folio ${f.folio} — ${fmt(f.total)}</option>`).join('');
+    _trfPendientes.map(f => `<option value="${f.folio}" data-id="${f.id}" data-monto="${f.total}">${f.razon||'Sin nombre'} — Folio ${f.folio} — ${fmt(f.total)}</option>`).join('');
   sel.onchange = function() {
     const opt = this.options[this.selectedIndex];
     if (!opt.dataset.monto) { document.getElementById('trf-saldo-info').innerHTML = ''; return; }
@@ -1925,6 +1936,7 @@ function openTransferenciaModal() {
 
 function closeTrfModal() {
   document.getElementById('trf-modal').style.display = 'none';
+  document.getElementById('trf-proveedor-search').value = '';
 }
 
 async function guardarTransferencia() {
