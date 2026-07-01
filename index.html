@@ -1885,8 +1885,14 @@ function updateTrfPlaceholders() {
     otro:          { ref: 'Referencia', placeholder: 'Opcional', monto: 'Monto (CLP)' },
   };
   const p = placeholders[medio] || placeholders.transferencia;
-  numLabel.innerHTML = `${p.ref} <span style="color:var(--text2)">(opcional)</span>`;
-  numInput.placeholder = p.placeholder;
+  const numRow = numInput.closest('.form-group');
+  if (medio === 'debito' || medio === 'efectivo' || medio === 'otro') {
+    if (numRow) numRow.style.display = 'none';
+  } else {
+    if (numRow) numRow.style.display = '';
+    numLabel.innerHTML = `${p.ref} <span style="color:var(--text2)">(opcional)</span>`;
+    numInput.placeholder = p.placeholder;
+  }
   montoLabel.textContent = p.monto;
 }
 
