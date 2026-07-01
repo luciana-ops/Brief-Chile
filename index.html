@@ -1400,13 +1400,9 @@ async function saveEditFactura() {
 
 async function updateFacturaInSheet(f) {
   try {
-    const rows = await sheetsRead('FACTURAS!A2:A1000');
-    const idx = rows.findIndex(r => r[0] === f.id);
-    if (idx === -1) return;
-    const rowNum = idx + 2;
-    await sheetsWrite(`FACTURAS!F${rowNum}`, [[f.tipo]]);
-    await sheetsWrite(`FACTURAS!J${rowNum}`, [[f.estado]]);
-    await sheetsWrite(`FACTURAS!K${rowNum}`, [[f.notas]]);
+    await sheetsUpdateById('FACTURAS', f.id, 'F', f.tipo);
+    await sheetsUpdateById('FACTURAS', f.id, 'J', f.estado);
+    await sheetsUpdateById('FACTURAS', f.id, 'K', f.notas);
   } catch(e) { console.error(e); }
 }
 
